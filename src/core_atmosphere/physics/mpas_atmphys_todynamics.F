@@ -22,6 +22,8 @@
  use mpas_atm_dimensions
 
  use mpas_atmphys_constants, only: R_d,R_v,degrad
+ use mpas_atmphys_tracer_transport, only: tracer_transport_enabled,tracer_transport_assemble, &
+                                          tracer_transport_add_tend
  use mpas_timer, only: mpas_timer_start, mpas_timer_stop
 
  implicit none
@@ -96,7 +98,7 @@
  
 !=================================================================================================================
  subroutine physics_get_tend(block,mesh,state,diag,tend,tend_physics,configs,rk_step,dynamics_substep, &
-                             tend_ru_physics,tend_rtheta_physics,tend_rho_physics,exchange_halo_group)
+                             tend_ru_physics,tend_rtheta_physics,tend_rho_physics,exchange_halo_group,dt)
 !=================================================================================================================
 
 !input variables:
@@ -107,6 +109,7 @@
  integer,intent(in):: rk_step
  integer,intent(in):: dynamics_substep
  procedure(halo_exchange_routine):: exchange_halo_group
+ real(kind=RKIND),intent(in):: dt      ! model time step [s], for the MICM gas transport tendencies
 
 !inout variables:
  type(mpas_pool_type),intent(inout):: diag
@@ -251,6 +254,14 @@
               rthratenlw,rthratensw,rublten_Edge,rucuten_Edge,                           &
               tend_th,tend_rtheta_physics,tend_scalars,tend_ru_physics,tend_u_phys,      &
               exchange_halo_group)
+
+!PBL and convective transport of the independently transported MICM gases (docs/plans/pbl-transport.md):
+!built from the post-chemistry state and added once per mapped scalar. Nothing is touched unless a gas
+!transport process is enabled.
+ if(tracer_transport_enabled()) then
+    call tracer_transport_assemble(mesh,state,dt)
+    call tracer_transport_add_tend(mass,tend_scalars)
+ endif
 
 !clean up any pointers that were allocated with zero size before the call to physics_get_tend_work:
  if(size(rucuten) == 0 ) deallocate(rucuten )

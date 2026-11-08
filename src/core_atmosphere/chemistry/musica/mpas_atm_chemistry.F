@@ -876,7 +876,7 @@ module mpas_atm_chemistry
     subroutine chemistry_init(configs, dimensions, structs, dminfo, blocklist)
 
 #ifdef MPAS_USE_MUSICA
-        use mpas_musica, only: musica_init, resolve_mpas_indices, &
+        use mpas_musica, only: musica_init, resolve_mpas_indices, musica_build_transport_map, &
                                musica_cache_photo_indices, musica_cache_emission_indices
         use mpas_miem, only: miem_init, miem_is_enabled, miem_get_species, &
                              miem_validate_owned_ids, miem_prepare_diagnostic_selection, &
@@ -888,7 +888,8 @@ module mpas_atm_chemistry
         use mpas_log, only : mpas_log_write
         use mpas_derived_types, only: mpas_pool_type, dm_info, block_type
         use mpas_pool_routines, only: mpas_pool_get_array, mpas_pool_get_config, &
-                                      mpas_pool_get_dimension, mpas_pool_get_subpool
+                                      mpas_pool_get_dimension, mpas_pool_get_subpool, &
+                                      mpas_pool_add_dimension
 
         type (mpas_pool_type), intent(in) :: configs
         type (mpas_pool_type), intent(in) :: dimensions
@@ -1218,6 +1219,39 @@ module mpas_atm_chemistry
             if (error_code /= 0) then
                 call chem_fatal(error_message)
             end if
+
+            ! Publish the independently transported gases to physics through the
+            ! block dimensions; physics does not import MUSICA modules
+            ! (docs/plans/pbl-transport.md, P1).
+            block
+                integer, pointer :: num_scalars_ptr, chem_first_ptr, chem_last_ptr
+                integer :: chem_first, chem_last
+                integer, allocatable :: transport_to_scalar(:)
+
+                nullify(num_scalars_ptr, chem_first_ptr, chem_last_ptr)
+                call mpas_pool_get_dimension(statePool, 'num_scalars', num_scalars_ptr)
+                call mpas_pool_get_dimension(statePool, 'chemistry_start', chem_first_ptr)
+                call mpas_pool_get_dimension(statePool, 'chemistry_end', chem_last_ptr)
+                if (.not. associated(num_scalars_ptr)) then
+                    call chem_fatal('[MUSICA] transport: num_scalars is unavailable.')
+                end if
+                chem_first = 0
+                chem_last = -1
+                if (associated(chem_first_ptr) .and. associated(chem_last_ptr)) then
+                    chem_first = chem_first_ptr
+                    chem_last = chem_last_ptr
+                end if
+                call musica_build_transport_map(num_scalars_ptr, chem_first, chem_last, &
+                                                transport_to_scalar, error_code, error_message)
+                if (error_code /= 0) then
+                    call chem_fatal(error_message)
+                end if
+                call mpas_pool_add_dimension(blocklist % dimensions, 'nMicmTransport', size(transport_to_scalar))
+                if (size(transport_to_scalar) > 0) then
+                    call mpas_pool_add_dimension(blocklist % dimensions, 'micmTransportIndex', transport_to_scalar)
+                end if
+            end block
+
             call chemistry_resolve_tracer_output_indices(statePool, error_code, error_message)
             if (error_code /= 0) then
                 call chem_fatal(error_message)

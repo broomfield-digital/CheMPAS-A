@@ -40,6 +40,9 @@ module atm_core
       use mpas_atm_chemistry, only: chemistry_init, chemistry_seed_chem, &
                                     chemistry_configure_tracer_output_streams
 #endif
+#ifdef DO_PHYSICS
+      use mpas_atmphys_tracer_transport, only: tracer_transport_init
+#endif
 
       implicit none
 
@@ -302,6 +305,14 @@ module atm_core
                              messageType=MPAS_LOG_ERR)
          return
       end if
+#endif
+
+      !
+      ! Initialize vertical transport of MICM gases by physics, after chemistry
+      ! has published the transported-gas map (empty without chemistry)
+      !
+#ifdef DO_PHYSICS
+      call tracer_transport_init(domain % blocklist)
 #endif
 
    end function atm_core_init
@@ -1107,6 +1118,7 @@ module atm_core
 
 #ifdef DO_PHYSICS
       use mpas_atmphys_finalize
+      use mpas_atmphys_tracer_transport, only: tracer_transport_finalize
 #endif
 
 #ifdef DO_CHEMISTRY
@@ -1142,6 +1154,8 @@ module atm_core
       call mpas_decomp_destroy_decomp_list(domain % decompositions)
 
 #ifdef DO_PHYSICS
+         call tracer_transport_finalize()
+
          block_ptr => domain % blocklist
          do while (associated(block_ptr))
             call atmphys_finalize(block_ptr%configs)

@@ -32,6 +32,7 @@ module mpas_musica
     public :: MICM_from_chemistry, MICM_to_chemistry
     public :: log_column_comparison, copy_state_to_ref
     public :: resolve_mpas_indices, n_chem_species, chem_species
+    public :: musica_build_transport_map
     public :: musica_query_species, musica_query_emission_species
     public :: musica_get_solver_tolerances
     public :: musica_tracer_name
@@ -404,6 +405,73 @@ module mpas_musica
         end do
 
     end subroutine resolve_mpas_indices
+
+    !------------------------------------------------------------------------
+    !  subroutine musica_build_transport_map
+    !
+    !> \brief MPAS scalar indices of the independently transported MICM gases
+    !> \details
+    !>  Applies build_transport_map to the resolved species table and logs
+    !>  each species with its scalar index or the reason it is excluded.
+    !>  chem_first:chem_last is the runtime chemistry constituent group in
+    !>  scalars; an index outside it would alias a native field. Call after
+    !>  resolve_mpas_indices. An empty map is valid.
+    !------------------------------------------------------------------------
+    subroutine musica_build_transport_map(num_scalars, chem_first, chem_last, transport_to_scalar, &
+                                          error_code, error_message)
+
+        use mpas_chem_transport_map, only: build_transport_map, transport_map_error_text, MAP_OK
+        use mpas_log, only: mpas_log_write
+
+        integer, intent(in) :: num_scalars
+        integer, intent(in) :: chem_first, chem_last
+        integer, allocatable, intent(out) :: transport_to_scalar(:)
+        integer, intent(out) :: error_code
+        character(len=:), allocatable, intent(out) :: error_message
+
+        integer, allocatable :: work(:)
+        integer :: i_sp, n_transport, bad_species
+
+        error_code = 0
+        error_message = ''
+
+        if (.not. allocated(chem_species) .or. n_chem_species == 0) then
+            allocate(transport_to_scalar(0))
+            call mpas_log_write('[MUSICA] transport: 0 independently transported gases')
+            return
+        end if
+
+        allocate(work(n_chem_species))
+        call build_transport_map(chem_species(1:n_chem_species)%mpas_index, &
+                                 chem_species(1:n_chem_species)%host_bound, &
+                                 chem_species(1:n_chem_species)%write_back, &
+                                 num_scalars, chem_first, chem_last, work, n_transport, &
+                                 error_code, bad_species)
+        if (error_code /= MAP_OK) then
+            error_message = '[MUSICA] transport: ' // trim(transport_map_error_text(error_code)) // &
+                ' for ' // trim(chem_species(bad_species)%micm_name) // ' (' // &
+                trim(chem_species(bad_species)%mpas_name) // ')'
+            return
+        end if
+
+        do i_sp = 1, n_chem_species
+            if (chem_species(i_sp)%host_bound) then
+                call mpas_log_write('[MUSICA] transport: exclude ' // trim(chem_species(i_sp)%micm_name) // &
+                    ' (host-bound to ' // trim(chem_species(i_sp)%mpas_name) // ')')
+            else if (.not. chem_species(i_sp)%write_back) then
+                call mpas_log_write('[MUSICA] transport: exclude ' // trim(chem_species(i_sp)%micm_name) // &
+                    ' (no write-back)')
+            else
+                call mpas_log_write('[MUSICA] transport: ' // trim(chem_species(i_sp)%micm_name) // &
+                    ' -> scalars($i)', intArgs=[chem_species(i_sp)%mpas_index])
+            end if
+        end do
+
+        allocate(transport_to_scalar(n_transport))
+        transport_to_scalar(:) = work(1:n_transport)
+        call mpas_log_write('[MUSICA] transport: $i independently transported gases', intArgs=[n_transport])
+
+    end subroutine musica_build_transport_map
 
     !------------------------------------------------------------------------
     !  subroutine musica_query_species

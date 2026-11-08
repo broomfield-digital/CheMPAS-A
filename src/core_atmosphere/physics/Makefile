@@ -50,6 +50,10 @@ OBJS = \
 	mpas_atmphys_rrtmg_swinit.o        \
 	mpas_atmphys_sfc_diagnostics.o     \
 	mpas_atmphys_todynamics.o          \
+	mpas_atmphys_tracer_column.o       \
+	mpas_atmphys_pbl_gas.o             \
+	mpas_atmphys_cu_gas.o              \
+	mpas_atmphys_tracer_transport.o    \
 	mpas_atmphys_update_surface.o      \
 	mpas_atmphys_update.o              \
 	mpas_atmphys_vars.o
@@ -235,7 +239,22 @@ mpas_atmphys_sfc_diagnostics.o: \
 
 mpas_atmphys_todynamics.o: \
 	mpas_atmphys_constants.o \
+	mpas_atmphys_tracer_transport.o \
 	mpas_atmphys_vars.o
+
+mpas_atmphys_tracer_column.o: \
+	mpas_atmphys_utilities.o
+
+mpas_atmphys_pbl_gas.o: \
+	mpas_atmphys_tracer_column.o
+
+mpas_atmphys_cu_gas.o: \
+	mpas_atmphys_tracer_column.o
+
+mpas_atmphys_tracer_transport.o: \
+	mpas_atmphys_cu_gas.o \
+	mpas_atmphys_pbl_gas.o \
+	mpas_atmphys_tracer_column.o
 
 mpas_atmphys_update_surface.o: \
 	mpas_atmphys_date_time.o \
