@@ -94,6 +94,17 @@ program test_tracer_transport_ops
    b = tracer_transport_budget(TRANSPORT_PBL, 1)
    call check(b%active_columns == 2, 'budgets restart each assembly')
 
+   ! Only owned cells (1:nCellsSolve) are assembled and updated, even where a process would act: with
+   ! nCellsSolve = 2, cell 3 (odd, so the PBL double is active there) and cell 4 keep every tendency bit.
+   call tracer_transport_teardown()
+   call tracer_transport_setup([SP1, SP2], nz, 2)
+   tend = tend0
+   call tracer_transport_assemble_columns(scalars, zz, rho_zz, zgrid, area, dt)
+   call tracer_transport_add_tend(mass, tend)
+   call check(bitwise_equal(tend(:,:,3:4), tend0(:,:,3:4)), 'cells beyond nCellsSolve keep every tendency bit')
+   expect = tend0(SP1,:,1) + (q2(1,:,1) - scalars0(SP1,:,1))/dt*mass(:,1)
+   call check(all(abs(tend(SP1,:,1) - expect) <= tol*maxval(abs(expect))), 'owned cells are still updated')
+
    call tracer_transport_teardown()
    call finish('test_tracer_transport_ops')
 

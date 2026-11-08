@@ -118,7 +118,8 @@
  if(.not.tracer_transport_enabled()) return
 
  call mpas_pool_get_array(state,'scalars' ,scalars,1)    ! post-chemistry, authoritative
- call mpas_pool_get_array(state,'rho_zz'  ,rho_zz ,1)    ! P2 proves the dry-mass weight vs. time level 2
+ call mpas_pool_get_array(state,'rho_zz'  ,rho_zz ,2)    ! the tendency mass; equal to level 1 here, and the
+                                                          ! level refreshed on the host under MPAS_OPENACC
  call mpas_pool_get_array(mesh ,'zz'      ,zz      )
  call mpas_pool_get_array(mesh ,'zgrid'   ,zgrid   )
  call mpas_pool_get_array(mesh ,'areaCell',areaCell)

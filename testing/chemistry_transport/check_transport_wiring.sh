@@ -122,14 +122,14 @@ for case in "${cases[@]}"; do
             for sp in NO NO2 O3; do
                 expect "$log" "[MUSICA] transport: $sp -> scalars(" "$sp is transported"
             done
-            expect "$log" "[transport] nMicmTransport = 3" "physics receives three gases"
+            expect "$log" "[transport] nMicmTransport = 3;" "physics receives three gases"
             ;;
         lnox_h2o)
             expect "$log" "[MUSICA] transport: exclude H2O (host-bound to qv)" "H2O is excluded"
-            expect "$log" "[transport] nMicmTransport = 3" "physics receives three gases"
+            expect "$log" "[transport] nMicmTransport = 3;" "physics receives three gases"
             ;;
         no_musica)
-            expect "$log" "[transport] nMicmTransport = 0" "physics receives no gases"
+            expect "$log" "[transport] nMicmTransport = 0;" "physics receives no gases"
             ;;
         *)
             echo "  FAIL unknown case $case"
