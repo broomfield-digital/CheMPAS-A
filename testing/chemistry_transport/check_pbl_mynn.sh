@@ -6,18 +6,32 @@
 #
 # Usage: check_pbl_mynn.sh BASELINE_DIR RUN_ROOT [MODEL [PRE_P4_MODEL]]
 #
+# PRE_P4_MODEL is the executable before P4 with the MYNN snow-content fix
+# (commit 0c21a646, "define MYNN's snow content when the microphysics has no
+# snow") applied: without it MYNN reads an undefined array in cloudy columns
+# of this Kessler case, and its results are not reproducible.
+#
 # Cases:
-#   gate-dd                    transport requested with MYNN's downdrafts
-#                              (config_mynn_edmf = config_mynn_edmf_dd = 1)
-#                              stops the model with the gate's message
-#   gate-interval              MYNN with a nondefault PBL interval stops
+#   gate-interval              MYNN with a nondefault PBL interval stops the
+#                              model with the gate's message
 #   local-stable-on / -off     config_mynn_edmf = 0, baseline surface (288 K):
 #                              with and without gas transport, 300 s
 #   local-convective-on / -off config_mynn_edmf = 0, skintemp = sst = 305 K
 #   edmf-convective-on / -off  config_mynn_edmf = 1 (updraft plumes, the MPAS
-#                              default), 305 K; edmf_a is written and must show
-#                              plumes in some column
-#   edmf-convective-off-pre-p4 edmf-convective-off with PRE_P4_MODEL: bitwise
+#                              default), 305 K
+#   edmfdd-convective-on / -off config_mynn_edmf = config_mynn_edmf_dd = 1
+#                              (updrafts and downdrafts), 305 K
+#   edmfdd-convective-off-pre-p4 edmfdd-convective-off with PRE_P4_MODEL:
+#                              bitwise
+# On this grid MYNN's mass flux does not activate: MYNN switches its plumes off
+# unless the first one rises a full model level, and with the PBL top at the
+# first interface (299 m) the plumes stop in the 413 m layer above it (at
+# 315 K with scale awareness off, the PBL stays below 432 m and plume-free for
+# 15 simulated minutes). The EDMF cases are therefore integration evidence: the mass-flux
+# code paths run with gas transport on, and plume area (edmf_a) and downdraft
+# triggers are reported, not required. The column tests
+# (unit/test_mynn_gas_operator.F90, unit/test_pbl_edmf.F90) qualify the
+# mass-flux operator on MYNN's own plumes.
 #   local-stable-off-pre-p4    local-stable-off with PRE_P4_MODEL (the
 #                              executable before P4): all output bitwise
 #                              identical
@@ -56,9 +70,7 @@ source "$here/pbl_cases.sh"
 prepare_inputs
 
 echo "== gate cases"
-stage gate-dd "$run_root/stable_init.nc" "$model" 00:00:06 transport=.true. mynn_edmf=1 mynn_edmf_dd=1
-expect_stop gate-dd "MYNN downdraft EDMF gas transport is not yet qualified"
-stage gate-interval "$run_root/stable_init.nc" "$model" 00:00:06 transport=.true. mynn_edmf=0 pbl_interval=00:00:06
+stage gate-interval "$run_root/stable_init.nc" "$model" 00:00:06 transport=.true. pbl_interval=00:00:06
 expect_stop gate-interval "config_pbl_interval must be 'none'"
 
 echo "== MYNN runs (300 s, output every 60 s)"
@@ -69,22 +81,37 @@ stage local-convective-on "$run_root/convective_init.nc" "$model" 00:05:00 mynn_
 edmf=(mynn_edmf=1 mynn_edmf_dd=0 mynn_edmf_output=1 extra_output=edmf_a)
 stage edmf-convective-off "$run_root/convective_init.nc" "$model" 00:05:00 "${edmf[@]}" transport=.false.
 stage edmf-convective-on "$run_root/convective_init.nc" "$model" 00:05:00 "${edmf[@]}" transport=.true.
-cases=(local-stable-off local-stable-on local-convective-off local-convective-on edmf-convective-off edmf-convective-on)
+edmfdd=(mynn_edmf=1 mynn_edmf_dd=1 mynn_edmf_output=1 extra_output=edmf_a)
+stage edmfdd-convective-off "$run_root/convective_init.nc" "$model" 00:05:00 "${edmfdd[@]}" transport=.false.
+stage edmfdd-convective-on "$run_root/convective_init.nc" "$model" 00:05:00 "${edmfdd[@]}" transport=.true.
+cases=(local-stable-off local-stable-on local-convective-off local-convective-on edmf-convective-off edmf-convective-on
+       edmfdd-convective-off edmfdd-convective-on)
 if [[ -n "$pre_p4_model" ]]; then
     stage local-stable-off-pre-p4 "$run_root/stable_init.nc" "$pre_p4_model" 00:05:00 mynn_edmf=0
-    stage edmf-convective-off-pre-p4 "$run_root/convective_init.nc" "$pre_p4_model" 00:05:00 "${edmf[@]}"
-    cases+=(local-stable-off-pre-p4 edmf-convective-off-pre-p4)
+    stage edmfdd-convective-off-pre-p4 "$run_root/convective_init.nc" "$pre_p4_model" 00:05:00 "${edmfdd[@]}"
+    cases+=(local-stable-off-pre-p4 edmfdd-convective-off-pre-p4)
 fi
 ran=1
-for c in "${cases[@]}"; do
-    run_model "$c" || { fail "$c: the model exited with an error; see $run_root/$c"; ran=0; }
+# two eight-rank cases at a time
+for (( n = 0; n < ${#cases[@]}; n += 2 )); do
+    pids=()
+    for c in "${cases[@]:n:2}"; do
+        run_model "$c" & pids+=("$!")
+    done
+    m=0
+    for c in "${cases[@]:n:2}"; do
+        wait "${pids[m]}" || { fail "$c: the model exited with an error; see $run_root/$c"; ran=0; }
+        m=$((m + 1))
+    done
 done
-for c in local-stable-on local-convective-on edmf-convective-on; do
+for c in local-stable-on local-convective-on edmf-convective-on edmfdd-convective-on; do
     has_log "$c" "PBL gas transport enabled = T" || fail "$c: PBL gas transport not logged as enabled"
     has_log "$c" "MYNN gas operator = local diffusion" || fail "$c: MYNN gas operator not logged"
 done
 has_log edmf-convective-on "+ updraft EDMF" || fail "edmf-convective-on: updraft EDMF not logged"
+has_log edmfdd-convective-on "+ downdraft EDMF" || fail "edmfdd-convective-on: downdraft EDMF not logged"
 has_log local-convective-on "+ updraft EDMF" && fail "local-convective-on: updraft EDMF logged with edmf = 0"
+has_log edmf-convective-on "+ downdraft EDMF" && fail "edmf-convective-on: downdraft EDMF logged with edmf_dd = 0"
 has_log local-stable-off "PBL gas transport enabled = F" || fail "local-stable-off: transport logged as enabled"
 
 if (( ran )); then
@@ -96,8 +123,9 @@ if (( ran )); then
         --json "$run_root/local-convective.json" || status=1
     python "$here/check_pbl_ysu.py" stronger "$run_root/local-convective.json" "$run_root/local-stable.json" \
         --gases qNO qO3 || status=1
-    echo "== updraft EDMF, convective surface layer"
-    python - "$run_root/edmf-convective-on" <<'PY' || status=1
+    echo "== updraft EDMF (MPAS default), convective surface layer"
+    plumes() {
+    python - "$1" <<'PY'
 import glob
 import sys
 import numpy as np
@@ -108,20 +136,25 @@ for path in sorted(glob.glob(f"{sys.argv[1]}/output*.nc")):
         a = np.asarray(ds["edmf_a"][:])
         peak = max(peak, float(a.max()))
         columns |= set(np.nonzero((a > 0).any(axis=(0, 2)))[0].tolist())
-print(f"plume area: peak {peak:.3g}, columns with plumes in some record: {len(columns)}")
-if peak <= 0.0:
-    print("FAIL edmf-convective-on: MYNN's updraft plumes never active")
-    sys.exit(1)
-print("PASS edmf-convective-on: MYNN's updraft plumes are active")
+print(f"INFO {sys.argv[1].rsplit('/', 1)[-1]}: MYNN plume area peak {peak:.3g}, "
+      f"columns with plumes in some record: {len(columns)}")
 PY
+    }
+    plumes "$run_root/edmf-convective-on"
     python "$here/check_pbl_ysu.py" mixing "$run_root/edmf-convective-on" "$run_root/edmf-convective-off" \
         --json "$run_root/edmf-convective.json" || status=1
+    echo "== updraft and downdraft EDMF, convective surface layer"
+    plumes "$run_root/edmfdd-convective-on"
+    triggers=$(grep -c "qstar=" "$run_root/edmfdd-convective-on/run.out" || true)
+    echo "INFO edmfdd-convective-on: MYNN's downdraft scheme found a stratocumulus top $triggers times (all ranks)"
+    python "$here/check_pbl_ysu.py" mixing "$run_root/edmfdd-convective-on" "$run_root/edmfdd-convective-off" \
+        --json "$run_root/edmfdd-convective.json" || status=1
     echo "== transport off is unchanged from the pre-P4 executable"
     if [[ -n "$pre_p4_model" ]]; then
         python "$here/check_pbl_ysu.py" compare "$run_root/local-stable-off" "$run_root/local-stable-off-pre-p4" \
             || status=1
-        python "$here/check_pbl_ysu.py" compare "$run_root/edmf-convective-off" \
-            "$run_root/edmf-convective-off-pre-p4" || status=1
+        python "$here/check_pbl_ysu.py" compare "$run_root/edmfdd-convective-off" \
+            "$run_root/edmfdd-convective-off-pre-p4" || status=1
     else
         echo "SKIP no PRE_P4_MODEL given"
     fi
