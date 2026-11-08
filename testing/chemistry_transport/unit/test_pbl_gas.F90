@@ -15,20 +15,28 @@ program test_pbl_gas
    character(len=StrKIND) :: reason
    real(kind=RKIND) :: kzq(nz), m_d(nz), dz(nz), G(nz+1), q(2,nz), q_ref(2,nz), q0(2,nz), rho(nz), qv(nz)
 
-   ! Capability gate (sketch §6.2; MYNN waits for P4, nondefault intervals for P5).
-   call pbl_gas_capability('off', 'off', 'none', supported, reason)
+   ! Capability gate (sketch §6.2; MYNN modes open stage by stage in P4, nondefault intervals wait for P5).
+   call pbl_gas_capability('off', 'off', 'none', 0, 0, supported, reason)
    call check(supported, 'PBL off is a supported zero-transport case')
-   call pbl_gas_capability('bl_ysu', 'sf_monin_obukhov', 'none', supported, reason)
-   call check(supported, 'YSU with a surface layer and the default interval is supported')
-   call pbl_gas_capability('bl_ysu', 'sf_monin_obukhov_rev', 'none', supported, reason)
-   call check(supported, 'YSU with the revised surface layer is supported')
-   call pbl_gas_capability('bl_ysu', 'off', 'none', supported, reason)
+   call pbl_gas_capability('bl_ysu', 'sf_monin_obukhov', 'none', 1, 0, supported, reason)
+   call check(supported, 'YSU with the Monin-Obukhov surface layer is supported')
+   call pbl_gas_capability('bl_ysu', 'sf_monin_obukhov_rev', 'none', 1, 1, supported, reason)
+   call check(supported, 'YSU with the revised Monin-Obukhov surface layer is supported (MYNN options ignored)')
+   call pbl_gas_capability('bl_ysu', 'off', 'none', 0, 0, supported, reason)
    call check(.not. supported .and. index(reason, 'surface layer') > 0, 'active PBL without a surface layer is rejected')
-   call pbl_gas_capability('bl_ysu', 'sf_monin_obukhov', '00:30:00', supported, reason)
+   call pbl_gas_capability('bl_ysu', 'sf_monin_obukhov', '00:30:00', 0, 0, supported, reason)
    call check(.not. supported .and. index(reason, 'config_pbl_interval') > 0, 'nondefault PBL interval is rejected')
-   call pbl_gas_capability('bl_mynn', 'sf_mynn', 'none', supported, reason)
-   call check(.not. supported .and. index(reason, 'MYNN') > 0, 'MYNN is rejected until it is qualified')
-   call pbl_gas_capability('bl_other', 'sf_monin_obukhov', 'none', supported, reason)
+   call pbl_gas_capability('bl_mynn', 'sf_mynn', 'none', 0, 0, supported, reason)
+   call check(supported, 'MYNN local diffusion (config_mynn_edmf = 0) is supported')
+   call pbl_gas_capability('bl_mynn', 'sf_mynn', 'none', 0, 1, supported, reason)
+   call check(supported, 'MYNN with EDMF off is local diffusion whatever config_mynn_edmf_dd says')
+   call pbl_gas_capability('bl_mynn', 'sf_mynn', 'none', 1, 0, supported, reason)
+   call check(.not. supported .and. index(reason, 'MYNN updraft EDMF gas transport is not yet qualified') > 0, &
+              'MYNN updraft EDMF is rejected until it is qualified')
+   call pbl_gas_capability('bl_mynn', 'sf_mynn', '00:30:00', 0, 0, supported, reason)
+   call check(.not. supported .and. index(reason, 'config_pbl_interval') > 0, &
+              'nondefault PBL interval is rejected with MYNN')
+   call pbl_gas_capability('bl_other', 'sf_monin_obukhov', 'none', 0, 0, supported, reason)
    call check(.not. supported .and. len_trim(reason) > 0, 'unknown PBL scheme is rejected')
 
    ! Operator cache.
@@ -70,6 +78,19 @@ program test_pbl_gas
               'moist-density store uses the dry layer mass rho/(1+qv)*dz (bitwise)')
    call pbl_gas_cache_store_moist_column(3, kzq, rho, -1.0_RKIND + 0.0_RKIND*qv, dz, ok)
    call check(.not. ok .and. .not. pbl_gas_active(3), 'a column with qv = -1 (no dry mass) is rejected')
+
+   ! MYNN hands over exch_h on the bottom face of each layer (P4a); the store uses the dry density.
+   call pbl_gas_cache_store_mynn_column(2, kzq, rho, qv, dz, ok)
+   call check(ok .and. pbl_gas_active(2), 'a MYNN column with exchange is active')
+   q = q0
+   call pbl_gas_apply(2, 30.0_RKIND, rho/(1.0_RKIND + qv)*dz, q)
+   call pbl_gas_exchange_faces(kzq, rho/(1.0_RKIND + qv), dz, G, ok)
+   q_ref = q0
+   call pbl_diffuse_column(30.0_RKIND, rho/(1.0_RKIND + qv)*dz, G, q_ref)
+   call check(all(transfer(q, [0_I8KIND]) == transfer(q_ref, [0_I8KIND])), &
+              'MYNN store: bottom-face exchange with the dry density rho/(1+qv) (bitwise)')
+   call pbl_gas_cache_store_mynn_column(2, -kzq, rho, qv, dz, ok)
+   call check(.not. ok .and. .not. pbl_gas_active(2), 'a MYNN column with negative exchange is rejected')
 
    kzq(2) = -1.0_RKIND
    call pbl_gas_cache_store_column(1, kzq, m_d, dz, ok)

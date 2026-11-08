@@ -1,17 +1,19 @@
 ! Unit tests for the MICM gas PBL operator construction (P3): interface exchange
 ! G(k+1) = 0.5*(m_d(k)+m_d(k+1))*K(k)/dzc**2 = rho_dry_interface*K/dzc, with K(k)
-! the scheme's scalar exchange coefficient between layers k and k+1.
+! the scheme's scalar exchange coefficient between layers k and k+1 (YSU, P3); and the MYNN form (P4a)
+! G(k) = rhoz_d(k)*K(k)/dzk with K(k) on the bottom face of layer k and MYNN's own face density
+! rhoz_d(k) = (rho_d(k)*dz(k-1)+rho_d(k-1)*dz(k))/(dz(k-1)+dz(k)).
 program test_pbl_gas_exchange
 
    use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
    use mpas_kind_types, only: RKIND
    use unit_assert, only: check, finish
-   use mpas_atmphys_pbl_gas, only: pbl_gas_exchange
+   use mpas_atmphys_pbl_gas, only: pbl_gas_exchange, pbl_gas_exchange_faces
 
    implicit none
 
    integer, parameter :: nz = 5
-   real(kind=RKIND) :: kzq(nz), m_d(nz), dz(nz), G(nz+1), expect
+   real(kind=RKIND) :: kzq(nz), m_d(nz), dz(nz), G(nz+1), expect, kh(nz), rho_d(nz), rhoz, dzk
    logical :: ok, all_ok
    integer :: k
 
@@ -52,6 +54,34 @@ program test_pbl_gas_exchange
    dz(4) = -5.0_RKIND
    call pbl_gas_exchange(kzq, m_d, dz, G, ok)
    call check(.not. ok, 'nonpositive layer thickness is rejected')
+
+   ! MYNN face convention (exch_h(k) on the bottom face of layer k; exch_h(1) is the surface).
+   kh = [5.0_RKIND, 1.0_RKIND, 2.0_RKIND, 3.0_RKIND, 4.0_RKIND]
+   rho_d = [1.2_RKIND, 1.1_RKIND, 1.0_RKIND, 0.9_RKIND, 0.8_RKIND]
+   dz  = [100.0_RKIND, 150.0_RKIND, 200.0_RKIND, 250.0_RKIND, 300.0_RKIND]
+   call pbl_gas_exchange_faces(kh, rho_d, dz, G, ok)
+   all_ok = ok .and. G(1) == 0.0_RKIND .and. G(nz+1) == 0.0_RKIND
+   do k = 2, nz
+      dzk = 0.5_RKIND*(dz(k) + dz(k-1))
+      rhoz = (rho_d(k)*dz(k-1) + rho_d(k-1)*dz(k))/(dz(k-1) + dz(k))
+      expect = rhoz*kh(k)/dzk
+      all_ok = all_ok .and. abs(G(k) - expect) <= 1.0e-14_RKIND*expect
+   end do
+   call check(all_ok, 'MYNN: face k uses K(k), MYNN''s face density and the center spacing; surface K ignored')
+   kh(3) = -1.0_RKIND
+   call pbl_gas_exchange_faces(kh, rho_d, dz, G, ok)
+   call check(.not. ok .and. all(G == 0.0_RKIND), 'MYNN: negative exchange coefficient is rejected')
+   kh(3) = ieee_value(1.0_RKIND, ieee_quiet_nan)
+   call pbl_gas_exchange_faces(kh, rho_d, dz, G, ok)
+   call check(.not. ok, 'MYNN: non-finite exchange coefficient is rejected')
+   kh(3) = 2.0_RKIND
+   rho_d(2) = 0.0_RKIND
+   call pbl_gas_exchange_faces(kh, rho_d, dz, G, ok)
+   call check(.not. ok, 'MYNN: nonpositive density is rejected')
+   rho_d(2) = 1.1_RKIND
+   kh(1) = -7.0_RKIND
+   call pbl_gas_exchange_faces(kh, rho_d, dz, G, ok)
+   call check(ok .and. G(1) == 0.0_RKIND, 'MYNN: the surface value is ignored')
 
    call finish('test_pbl_gas_exchange')
 

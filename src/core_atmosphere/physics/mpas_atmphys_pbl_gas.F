@@ -18,16 +18,18 @@
  public:: pbl_gas_init,               &
           pbl_gas_capability,         &
           pbl_gas_exchange,           &
+          pbl_gas_exchange_faces,     &
           pbl_gas_cache_setup,        &
           pbl_gas_cache_store_column, &
           pbl_gas_cache_store_moist_column, &
+          pbl_gas_cache_store_mynn_column,  &
           pbl_gas_enabled,            &
           pbl_gas_active,             &
           pbl_gas_apply,              &
           pbl_gas_finalize
 
 
-!PBL vertical mixing of MICM gases (docs/plans/pbl-transport.md, P3). Interface used by
+!PBL vertical mixing of MICM gases (docs/plans/pbl-transport.md, P3 and P4). Interface used by
 !mpas_atmphys_tracer_transport:
 !   pbl_gas_init(block,nTransport)   resolve the scheme and check capability, once after chemistry_init
 !   pbl_gas_enabled()                true when PBL gas transport can act in any column
@@ -38,9 +40,10 @@
 !Each model step, the PBL driver stores the scheme's scalar exchange as interface exchange G [kg m-2 s-1]
 !(pbl_gas_cache_store_column) before chemistry runs; transport assembly in the same step applies the
 !closed-column backward-Euler diffusion with the model dt to the post-chemistry gases. Only the operator is
-!held, never a gas increment. Supported: YSU (with or without top-down mixing) at the default PBL interval,
-!with a surface layer scheme; PBL off is a supported zero-transport case. MYNN (P4) and nondefault PBL
-!intervals (P5) stop the model when gas transport is requested.
+!held, never a gas increment. Supported at the default PBL interval, with a surface layer scheme: YSU (with
+!or without top-down mixing) and MYNN local diffusion (config_mynn_edmf = 0); PBL off is a supported
+!zero-transport case. MYNN's mass-flux (EDMF) modes and nondefault PBL intervals (P5) stop the model when
+!gas transport is requested.
 
 
  logical,save:: enabled = .false.
@@ -60,17 +63,21 @@
 
  logical,pointer:: requested
  character(len=StrKIND),pointer:: pbl_scheme,sfclayer_scheme,pbl_interval
+ integer,pointer:: mynn_edmf,mynn_edmf_dd
  integer,pointer:: nVertLevels,nCellsSolve
+ integer:: edmf,edmf_dd
  logical:: supported
  character(len=StrKIND):: reason
 
  call pbl_gas_finalize()
 
- nullify(requested,pbl_scheme,sfclayer_scheme,pbl_interval)
+ nullify(requested,pbl_scheme,sfclayer_scheme,pbl_interval,mynn_edmf,mynn_edmf_dd)
  call mpas_pool_get_config(block%configs,'config_micm_pbl_transport',requested)
  call mpas_pool_get_config(block%configs,'config_pbl_scheme'        ,pbl_scheme)
  call mpas_pool_get_config(block%configs,'config_sfclayer_scheme'   ,sfclayer_scheme)
  call mpas_pool_get_config(block%configs,'config_pbl_interval'      ,pbl_interval)
+ call mpas_pool_get_config(block%configs,'config_mynn_edmf'         ,mynn_edmf)
+ call mpas_pool_get_config(block%configs,'config_mynn_edmf_dd'      ,mynn_edmf_dd)
  if(.not.associated(requested)) return
  if(.not.requested) return
 
@@ -79,8 +86,14 @@
     return
  endif
 
- call pbl_gas_capability(pbl_scheme,sfclayer_scheme,pbl_interval,supported,reason)
+ edmf    = 0
+ edmf_dd = 0
+ if(associated(mynn_edmf)   ) edmf    = mynn_edmf
+ if(associated(mynn_edmf_dd)) edmf_dd = mynn_edmf_dd
+ call pbl_gas_capability(pbl_scheme,sfclayer_scheme,pbl_interval,edmf,edmf_dd,supported,reason)
  call tracer_transport_check_capability('PBL',.true.,pbl_scheme,supported,reason)
+ if(trim(pbl_scheme) == 'bl_mynn') &
+    call mpas_log_write('[transport] PBL: MYNN gas operator = local diffusion (exch_h)')
 
  enabled = trim(pbl_scheme) /= 'off'
  if(enabled) then
@@ -92,10 +105,14 @@
  end subroutine pbl_gas_init
 
 !=================================================================================================================
- pure subroutine pbl_gas_capability(pbl_scheme,sfclayer_scheme,pbl_interval,supported,reason)
+ pure subroutine pbl_gas_capability(pbl_scheme,sfclayer_scheme,pbl_interval,mynn_edmf,mynn_edmf_dd, &
+                                    supported,reason)
 !=================================================================================================================
-!qualified PBL configurations for MICM gas transport.
+!qualified PBL configurations for MICM gas transport. mynn_edmf and mynn_edmf_dd are config_mynn_edmf and
+!config_mynn_edmf_dd (used only for MYNN): MYNN runs its downdrafts only inside its updraft scheme, so with
+!config_mynn_edmf /= 1 MYNN is local diffusion whatever config_mynn_edmf_dd says.
  character(len=*),intent(in):: pbl_scheme,sfclayer_scheme,pbl_interval
+ integer,intent(in):: mynn_edmf,mynn_edmf_dd
  logical,intent(out):: supported
  character(len=*),intent(out):: reason
 
@@ -107,7 +124,12 @@
     case('bl_ysu')
        supported = .true.
     case('bl_mynn')
-       reason = 'MYNN gas transport is not yet qualified (P4 of docs/plans/pbl-transport.md)'
+       if(mynn_edmf /= 1) then
+          supported = .true.
+       else
+          reason = 'MYNN updraft EDMF gas transport is not yet qualified (P4b of docs/plans/pbl-transport.md); '// &
+                   'set config_mynn_edmf = 0'
+       endif
     case default
        reason = 'no MICM gas adapter for this PBL scheme'
  end select
@@ -155,6 +177,39 @@
  end subroutine pbl_gas_exchange
 
 !=================================================================================================================
+ pure subroutine pbl_gas_exchange_faces(kh,rho_d,dz,G,ok)
+!=================================================================================================================
+!interface exchange [kg m-2 s-1] for the closed-column diffusion kernel from an exchange coefficient on the
+!bottom face of each layer, kh(k) [m2 s-1] between layers k-1 and k (MYNN's exch_h; kh(1), the surface, is
+!ignored):
+!   G(k) = rhoz_d(k)*kh(k)/dzk,  dzk = 0.5*(dz(k)+dz(k-1)),
+!   rhoz_d(k) = (rho_d(k)*dz(k-1)+rho_d(k-1)*dz(k))/(dz(k-1)+dz(k)),   k = 2..nz,
+!MYNN's khdz = rhoz*dfh with the dry density (exch_h = dfh*dzk). G(1) = G(nz+1) = 0. ok is false, and G is
+!zero, unless kh(2:nz) >= 0, rho_d > 0 and dz > 0 are finite.
+ use,intrinsic:: ieee_arithmetic,only: ieee_is_finite
+ real(kind=RKIND),intent(in),dimension(:):: kh      ! (nz) [m2 s-1]
+ real(kind=RKIND),intent(in),dimension(:):: rho_d   ! (nz) dry air density [kg m-3]
+ real(kind=RKIND),intent(in),dimension(:):: dz      ! (nz) layer thickness [m]
+ real(kind=RKIND),intent(out),dimension(:):: G      ! (nz+1)
+ logical,intent(out):: ok
+ real(kind=RKIND):: rhoz,dzk
+ integer:: k,nz
+
+ nz = size(rho_d)
+ G(:) = 0._RKIND
+ ok = all(ieee_is_finite(rho_d)) .and. all(ieee_is_finite(dz)) .and. all(ieee_is_finite(kh(2:nz)))
+ if(ok) ok = all(rho_d > 0._RKIND) .and. all(dz > 0._RKIND) .and. all(kh(2:nz) >= 0._RKIND)
+ if(.not.ok) return
+
+ do k = 2, nz
+    dzk  = 0.5_RKIND*(dz(k)+dz(k-1))
+    rhoz = (rho_d(k)*dz(k-1)+rho_d(k-1)*dz(k))/(dz(k-1)+dz(k))
+    G(k) = rhoz*kh(k)/dzk
+ enddo
+
+ end subroutine pbl_gas_exchange_faces
+
+!=================================================================================================================
  subroutine pbl_gas_cache_setup(nlevels,ncells)
 !=================================================================================================================
 !allocate the per-column operator cache; every column starts inactive.
@@ -194,6 +249,21 @@
  call pbl_gas_cache_store_column(iCell,kzq,rho/(1._RKIND+qv)*dz,dz,ok)
 
  end subroutine pbl_gas_cache_store_moist_column
+
+!=================================================================================================================
+ subroutine pbl_gas_cache_store_mynn_column(iCell,kh,rho,qv,dz,ok)
+!=================================================================================================================
+!store this step's MYNN operator for column iCell from exch_h on the bottom face of each layer and the PBL
+!driver's moist density rho = rho_dry*(1+qv) (pbl_gas_exchange_faces with rho_dry = rho/(1+qv)). An invalid
+!column (ok = .false.) is left inactive; the caller decides whether to stop.
+ integer,intent(in):: iCell
+ real(kind=RKIND),intent(in),dimension(:):: kh,rho,qv,dz
+ logical,intent(out):: ok
+
+ call pbl_gas_exchange_faces(kh,rho/(1._RKIND+qv),dz,g_cache(:,iCell),ok)
+ mask_cache(iCell) = ok .and. any(g_cache(:,iCell) > 0._RKIND)
+
+ end subroutine pbl_gas_cache_store_mynn_column
 
 !=================================================================================================================
  logical function pbl_gas_enabled()

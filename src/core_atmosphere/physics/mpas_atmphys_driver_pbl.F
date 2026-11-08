@@ -17,7 +17,7 @@
  use bl_mynn,only: bl_mynn_init
  use module_bl_mynn,only: mynn_bl_driver
  use module_bl_ysu
- use mpas_atmphys_pbl_gas,only: pbl_gas_enabled,pbl_gas_cache_store_moist_column
+ use mpas_atmphys_pbl_gas,only: pbl_gas_enabled,pbl_gas_cache_store_moist_column,pbl_gas_cache_store_mynn_column
  use mpas_atmphys_utilities,only: physics_error_fatal
 
  implicit none
@@ -968,6 +968,7 @@
                   errmsg = errmsg , errflg = errflg                                                       &
                           )
        call mpas_timer_stop('bl_mynn')
+       if(pbl_gas_enabled()) call pbl_gas_store_mynn(its,ite)
 !      call mpas_log_write('--- exit subroutine mynn_bl_driver:')
 !      call mpas_log_write(' ')
 
@@ -1001,6 +1002,26 @@
  enddo
 
  end subroutine pbl_gas_store_ysu
+
+!=================================================================================================================
+ subroutine pbl_gas_store_mynn(its,ite)
+!=================================================================================================================
+!hand this step's MYNN scalar exchange (exch_h, on the bottom face of each layer) to the MICM gas PBL transport,
+!per owned column; rho_p includes water vapor, and the stored operator uses the dry density.
+ integer,intent(in):: its,ite
+ logical:: ok
+ integer:: i,j
+
+ do j = jts,jte
+ do i = its,ite
+    call pbl_gas_cache_store_mynn_column(i,kzh_p(i,kts:kte,j),rho_p(i,kts:kte,j),qv_p(i,kts:kte,j), &
+                                         dz_p(i,kts:kte,j),ok)
+    if(.not.ok) call physics_error_fatal('[transport] PBL: invalid MYNN exchange operator for MICM gases '// &
+                                         '(negative or non-finite exchange, or nonpositive layer mass)')
+ enddo
+ enddo
+
+ end subroutine pbl_gas_store_mynn
 
 !=================================================================================================================
  end module mpas_atmphys_driver_pbl

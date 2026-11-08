@@ -37,7 +37,7 @@ fi
 
 framework=$repo/src/framework
 core=$repo/src/core_atmosphere
-# The YSU column test needs the MMM-physics export patch (idempotent).
+# The YSU and MYNN column tests need the MMM-physics export patches (idempotent).
 "$core/physics/apply_mmm_patches.sh" > /dev/null
 esmf_time=$repo/src/external/esmf_time_f90
 
@@ -48,6 +48,12 @@ sources=(
     "$core/physics/ccpp_kind_types.F"
     "$core/physics/physics_mmm/bl_ysu.F90"
     "$core/physics/physics_wrf/module_bl_ysu.F"
+    "$core/physics/physics_mmm/mynn_shared.F90"
+    "$core/physics/physics_mmm/bl_mynn_subroutines.F90"
+    "$core/physics/physics_mmm/bl_mynn.F90"
+    "$core/physics/physics_wrf/bl_mynn_pre.F"
+    "$core/physics/physics_wrf/bl_mynn_post.F"
+    "$core/physics/physics_wrf/module_bl_mynn.F"
     "$core/physics/mpas_atmphys_tracer_column.F"
     "$core/physics/mpas_atmphys_pbl_diffusion.F"
     "$core/physics/mpas_atmphys_pbl_gas.F"
@@ -55,6 +61,8 @@ sources=(
     "$core/physics/mpas_atmphys_tracer_transport.F"
 )
 support=("$here/unit_assert.F90")
+# Test helpers that use production modules, compiled after the sources.
+late_support=("$here/mynn_column.F90")
 # Reference column fixtures (columns/make_diffusion_fixtures.py).
 export CHEMPAS_UNIT_COLUMNS=${CHEMPAS_UNIT_COLUMNS:-$here/../columns}
 
@@ -89,6 +97,9 @@ for name in "${tests[@]}"; do
         else
             compile "$src"
         fi
+    done
+    for src in "${late_support[@]}"; do
+        compile "$src"
     done
     objects=(*.o)
     compile "$here/$name.F90"
