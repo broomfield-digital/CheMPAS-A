@@ -1,7 +1,8 @@
 # Implementation plan: PBL transport of MICM tracers
 
-Status: the P1 shared foundation is implemented (`0e2f15f6`). Scheme transport
-and qualification (P2–P6) are pending.
+Status: the P1 shared foundation (`0e2f15f6`) and P2, the column diffusion
+kernel and tendency proof (`7ae5f39d` shared, `0eb2c8ad`), are implemented. Scheme
+transport and qualification (P3–P6) are pending.
 
 - Tracking issue: [CheMPAS-A #40](https://github.com/NCAR/CheMPAS-A/issues/40).
 - Branch: `chempas-a-pbl`, from `chempas-a` at
@@ -133,9 +134,10 @@ deterministic application, and retained license notices. An edited ignored
   dry-mass budget helper, and diagnostic schema. Commit `0e2f15f6`; its API,
   Makefile dependencies and evidence are under
   [P1 shared foundation](#p1-shared-foundation-implemented).
-- [ ] P2: standalone conservative column kernels and independent reference
+- [x] P2: standalone conservative column kernels and independent reference
   fixtures; prove `rho_zz` conversion and tendency consumption for each supported
-  advection mode before connecting active mixing.
+  advection mode before connecting active mixing. Commits `7ae5f39d` (shared) and
+  `0eb2c8ad`; see [P2](#p2-column-diffusion-kernel-and-tendency-proof-implemented).
 - [ ] P3: YSU runtime interface/operator exports, generic tendency assembly,
   default-interval integration, and stable/unstable/top-down qualification.
 - [ ] P4: MYNN local diffusion, then updraft EDMF, then downdraft EDMF in separate
@@ -261,6 +263,150 @@ Deferred to the stage that first runs the pool path (P2/P3):
 For the convection branch: the shared comments cite this plan, and
 `check_transport_wiring.sh` needs the supercell baseline tooling from
 `chempas-a-pbl`. The unit tests are self-contained.
+
+## P2 column diffusion kernel and tendency proof (implemented)
+
+P2 has two commits on `chempas-a-pbl`:
+
+- `7ae5f39d`, a shared commit. Cherry-pick it onto `chempas-a-convect` as well;
+  together with P1 it applies cleanly there.
+  - Assembly takes the dry-mass weight from `rho_zz` time level 2, the array
+    that also scales the tendency. At that call it equals level 1, and under
+    `MPAS_OPENACC` it is the level refreshed on the host.
+  - It adds an owned-cell (`nCellsSolve`) test guard and an exact wiring match.
+  - It adds `check_dry_mass_metric.py`.
+- `0eb2c8ad`, the PBL-only kernel and the proofs.
+
+No PBL scheme is connected; the production `pbl_gas` stub stays disabled.
+
+### Kernel
+
+`physics/mpas_atmphys_pbl_diffusion.F` provides
+`pbl_diffuse_column(dt, m_d, G, q)`, a closed-column backward-Euler diffusion.
+`G(k) = rho*Kz/dz` at the interface below layer k, and the ground and top
+interfaces are always closed.
+
+The kernel solves for the increment, whose right-hand side is the flux
+divergence of `q0`, using one Thomas factorization for every species. It then
+applies the interface fluxes of `q0 + increment` to `q0` in flux form. The
+results, to roundoff at any stiffness:
+
+- the column mass telescopes exactly;
+- a uniform profile has zero right-hand side and stays exactly unchanged;
+- values stay within their initial range;
+- a zero species stays exactly zero (there is no floor).
+
+The forms considered along the way:
+
+- Solving for the state alone loses mass in proportion to `dt*G/m_d` times
+  machine precision: 6e-10 over 1,000 calls at a ratio of 1e5, which fails the
+  frozen threshold.
+- A flux-form finish on the state conserves mass, but a uniform profile drifts
+  past the frozen 1e-12 limit above a ratio of about 2e3.
+- The increment form keeps both. Its error relative to the exact backward-Euler
+  solution grows like `kappa*eps`, where `kappa = max dt*(G(k)+G(k+1))/m_d(k)`
+  (1.7e-12 at a kappa of 960). That error is negligible next to the
+  truncation error.
+
+Preconditions, which the P3 caller must check: `m_d > 0`, `G >= 0` and finite,
+and consistent sizes.
+
+Verification (`unit/test_pbl_diffusion.F90`, 53 checks):
+
+- agreement with six reference fixtures (`columns/make_diffusion_fixtures.py`),
+  each an exact rational dense solve of the flux-form system, within
+  `max(1e-12, 32*eps*kappa)`. The fixtures cover nonuniform `m_d` and `G`;
+  zero, near-zero and step species; pulses at the bottom, middle and top; a
+  sharp gradient; zero coefficients; a large timestep (kappa = 960); and a
+  uniform profile;
+- mass residual ≤ 1e-12 per call and ≤ 1e-10 over 1,000 calls, up to
+  `dt*G/m_d = 1e6`;
+- a uniform profile unchanged, and the maximum principle, at 1e4 and 1e6;
+- nonnegativity and zero species;
+- bitwise invariance to species order and to the values supplied at the closed
+  interfaces;
+- the analytic backward-Euler decay of cosine modes.
+
+### Dry-mass weight
+
+MPAS applies the vertical scalar flux divergence with `rdzw`, so the tracer
+mass it conserves per column is `sum(rho_zz*q/rdzw)`. The kernels use
+`m_d = zz*rho_zz*dz`. Initialization defines `zz` and `rdzw` from the same
+interface heights, so `zz*dz*rdzw = 1`. `check_dry_mass_metric.py` measures it
+on real meshes: 1.1e-16 on the flat supercell and 2.2e-16 on the mountain
+wave (250 m relief). `rho_zz` is the dry density (`mpas_init_atm_cases.F`
+divides by `1 + qv`).
+
+### Realized-increment proof
+
+`check_realized_increment.sh` builds the model from tracked files with
+`model_doubles/mpas_atmphys_pbl_gas.F`, a test double whose mode comes from
+`CHEMPAS_TEST_PBL_GAS`:
+
+- source: `q += dt*S`, with S in closed form;
+- diffusion: the kernel with constant G;
+- off.
+
+Each case runs three 3-s steps on a horizontally uniform dry base state
+(`make_resting_init.py`) with an inert mechanism. `check_realized_increment.py`
+compares the results with independent predictions.
+
+It covers six advection settings:
+
+- monotonic;
+- ordinary;
+- positive-definite (MPAS warns that this is unimplemented and runs the
+  monotonic path; the outputs are bitwise identical);
+- monotonic with split transport (3 dynamics steps per transport step);
+- ordinary with split transport;
+- monotonic with chemistry every 2 steps.
+
+There are 28 checks on 30 runs, all passing (GNU, eight ranks):
+
+| Regime | Checks | Result |
+| --- | --- | --- |
+| At rest (eddy viscosity off; \|w\| ≤ 4e-14 m/s), all six settings × source, diffusion, plus off | every layer and cell: realized vs. requested increment within 1e-18 + 1e-10·\|requested\| (source: `S*dt`; diffusion: a numpy dense solve with `m_d` from the start of the step); column budget | per-layer error ≤ 6e-23 kg/kg; budget ≤ 3.4e-16 |
+| Moving (the case's eddy viscosity drives a uniform drift, \|Δρ\|/ρ ≈ 9e-6 per step), same matrix | column budget: realized change = `dt*Σ R*m_d(t)` (0 for diffusion and off), within 1e-12 of the column mass | ≤ 4.2e-16; a weight taken at `t + dt` would miss by 3.9e-10 |
+| Fresh (NO₂ photolysis on, at rest), monotonic and ordinary | first step: `q(t1) = D(q_off(t1))`, i.e. diffusion of the post-chemistry state from the matching off run | exact within tolerance; a stale, pre-chemistry tendency would miss by 1.3e-13 |
+
+So in the four distinct advection paths (ordinary or monotonic, each split or
+not), the gas tendency is applied exactly once and is not replayed. It acts on
+the post-chemistry state, and its dry-mass weight is `rho_zz` at the start of
+the step. Diffusion conserves the column in every mode.
+
+### Findings
+
+- Under motion, the per-layer placement of a source differs by advection path.
+  The monotonic stage 3 adds `dt*R` to the old state before transport, so the
+  increment moves with the air. The ordinary path adds it in flux form, in
+  place. In the moving case the difference reached 8e-5 of the increment. Both
+  conserve the column exactly and agree exactly at rest. This is ordinary
+  operator splitting, not a defect, so per-layer agreement is asserted only at
+  rest.
+- Even from its dry base state, the supercell case's eddy viscosity (500 m² s⁻¹
+  on momentum and theta) drives a horizontally uniform vertical drift of a few
+  mm/s.
+- MICM rejects a mechanism with no rate parameters, so the inert test mechanism
+  keeps its reactions, with Arrhenius `A = 0` and photolysis `j = 0`. Turning
+  TUV-x off also requires upper-column mode `none`, no top extension, and an
+  empty extension file.
+- A fresh whole-branch review found one critical issue and two important ones,
+  all fixed before the squash:
+  - the reference fixtures were ignored by the repository's `*.txt` rule;
+  - the earlier state-form finish drifted on uniform profiles when stiff;
+  - the coverage claims for the positive-definite and chemistry-interval cases
+    were overstated.
+
+Deferred:
+
+- No moist or terrain end-to-end column has been run: the test state has
+  `zz = 1` and `qv = 0`. P3's YSU columns will be the first.
+- Kernel input checks belong to the P3 caller.
+- Script robustness (Open MPI's `mpiexec -x`, provenance when reusing a build)
+  and an entry point for the Python self-tests.
+- Halo and MPI coverage with horizontally varying sources (P5).
+- P1's remaining minor items: budget naming, accessor range checks, and
+  `chemistry_init` aliasing.
 
 ## Verification and completion criteria
 
