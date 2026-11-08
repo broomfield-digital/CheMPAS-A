@@ -1,6 +1,7 @@
 # Implementation plan: PBL transport of MICM tracers
 
-Status: planned; transport implementation and qualification are pending.
+Status: the P1 shared foundation is implemented (`0e2f15f6`). Scheme transport
+and qualification (P2–P6) are pending.
 
 - Tracking issue: [CheMPAS-A #40](https://github.com/NCAR/CheMPAS-A/issues/40).
 - Branch: `chempas-a-pbl`, from `chempas-a` at
@@ -93,8 +94,10 @@ proposed interfaces, not existing routines or namelist options.
    finalize and test repeated initialization.
 
 Introduce `config_micm_pbl_transport = .false.` as an independent opt-in control.
-Its disabled path must preserve the baseline. Empty `config_micm_file` and
-`MUSICA=false` remain no-ops. Resolve `suite` before checking support; log the
+Its disabled path must preserve the baseline. `MUSICA=false` remains a no-op.
+An empty `config_micm_file` is not one: in MUSICA builds it already aborts in
+`musica_init` at the branch base, independently of transport. Resolve `suite`
+before checking support; log the
 resolved scheme and transport capability. An enabled, unsupported combination
 must stop during initialization with an actionable message. `pbl_scheme='off'`
 is a supported zero-transport case; an active PBL with surface layer off is not.
@@ -126,9 +129,10 @@ deterministic application, and retained license notices. An edited ignored
 
 - [x] Audit #40, branch base, native ownership, scheme hooks, and time ordering.
 - [x] Record this branch plan and link the companion effort.
-- [ ] P1: shared map, empty/no-MUSICA path, block lifecycle, capability checks,
-  dry-mass budget helper, and diagnostic schema. Publish its commit ID here for
-  reuse by the convection branch; include exact Makefile dependencies.
+- [x] P1: shared map, empty/no-MUSICA path, block lifecycle, capability checks,
+  dry-mass budget helper, and diagnostic schema. Commit `0e2f15f6`; its API,
+  Makefile dependencies and evidence are under
+  [P1 shared foundation](#p1-shared-foundation-implemented).
 - [ ] P2: standalone conservative column kernels and independent reference
   fixtures; prove `rho_zz` conversion and tendency consumption for each supported
   advection mode before connecting active mixing.
@@ -147,6 +151,116 @@ interface, manager, control, initialization/finalization and tendency assembly;
 YSU/MYNN wrappers; necessary MMM exports; and affected Makefiles. Modify core
 time integration or halo groups only where the verified application contract
 requires it. Keep shared foundation commits separate from scheme commits.
+
+## P1 shared foundation (implemented)
+
+P1 is commit `0e2f15f6` on `chempas-a-pbl`. Reuse it unchanged as C1 on
+`chempas-a-convect`; each branch then replaces only the body of its own process
+module. With no process enabled, P1 changes no model output.
+
+| File (under `src/core_atmosphere/`) | Role |
+| --- | --- |
+| `chemistry/musica/mpas_chem_transport_map.F` | Dependency-free map kernel: every non-host-bound, write-back MICM species in mechanism order. Rejects an index out of range, outside the runtime `chemistry` constituent group (`chemistry_start:chemistry_end`), or repeated. |
+| `chemistry/musica/mpas_musica.F` | `musica_build_transport_map` applies the kernel to `chem_species` and logs each species' scalar index or exclusion reason. |
+| `chemistry/musica/mpas_atm_chemistry.F` | `chemistry_init` publishes `nMicmTransport` and `micmTransportIndex` to `block % dimensions` after `resolve_mpas_indices`. |
+| `physics/mpas_atmphys_tracer_column.F` | Pure closed-column kernels (dry mass `zz*rho_zz*dz`, flux divergence, relative residual), the `transport_budget_t` schema, and pure capability and cache checks. Two wrappers log and stop the model: `tracer_transport_check_capability(process, enabled, scheme, supported, reason)` and `transport_cache_validate(meta, signature, restart_has_cache, enabled)`. |
+| `physics/mpas_atmphys_pbl_gas.F`, `physics/mpas_atmphys_cu_gas.F` | Identity stubs: `*_init(block, nTransport)`, `*_enabled()`, `*_active(iCell)`, `*_apply(iCell, dt, m_d, q)`, `*_finalize()`. |
+| `physics/mpas_atmphys_tracer_transport.F` | Map and per-rank budgets. Runs `q1 = PBL(q0)`, `q2 = CU(q1)` on scratch columns, and `tracer_transport_add_tend` adds `(R_pbl + R_cu)*rho_zz` once per mapped scalar. Initializes the processes before sizing buffers; the `(nTransport, nVertLevels, nCellsSolve)` tendency buffers exist only when a process is enabled. |
+| `physics/mpas_atmphys_todynamics.F` | `physics_get_tend(..., dt)` calls assembly and `add_tend` only when `tracer_transport_enabled()`. |
+| `dynamics/mpas_atm_time_integration.F` | `atm_srk3` passes the model `dt`. |
+| `mpas_atm_core.F` | `tracer_transport_init` after `chemistry_init`; `tracer_transport_finalize` before the physics finalize. |
+
+Makefile dependencies added in P1:
+
+```makefile
+# src/core_atmosphere/physics/Makefile (OBJS += the four new objects)
+mpas_atmphys_todynamics.o: \
+	mpas_atmphys_constants.o \
+	mpas_atmphys_tracer_transport.o \
+	mpas_atmphys_vars.o
+
+mpas_atmphys_tracer_column.o: \
+	mpas_atmphys_utilities.o
+
+mpas_atmphys_pbl_gas.o: \
+	mpas_atmphys_tracer_column.o
+
+mpas_atmphys_cu_gas.o: \
+	mpas_atmphys_tracer_column.o
+
+mpas_atmphys_tracer_transport.o: \
+	mpas_atmphys_cu_gas.o \
+	mpas_atmphys_pbl_gas.o \
+	mpas_atmphys_tracer_column.o
+
+# src/core_atmosphere/chemistry/musica/Makefile (OBJS += mpas_chem_transport_map.o, always built)
+mpas_musica.o: mpas_chem_constants.o mpas_chem_transport_map.o
+```
+
+libphys still does not depend on libchem: the map crosses only through
+`block % dimensions`.
+
+How P1 differs from the [code sketches](pbl-transport-code.md) (§5):
+
+- The native-collision check uses the runtime `chemistry` constituent group
+  range instead of a list of native indices. Runtime registration places every
+  MICM tracer in that group, so any index outside it aliases another field.
+- Process init takes `(block, nTransport)` instead of `(configs)`. A process
+  can then reach configs, structs and dimensions, and can log a no-op for an
+  empty map.
+- Each process exposes `*_enabled()` as a function. When neither process is
+  enabled, physics skips all transport work, leaves `tend_scalars` untouched,
+  and allocates no tendency buffers.
+- The map and column kernels are pure, so they are unit tested without MICM or
+  an initialized MPAS log. Only the two wrappers named above log.
+- Budgets are weighted by `areaCell`, so masses are in kg. P1 defines the schema
+  and the per-rank accumulation over active columns. Rank reduction, output and
+  OpenMP directives come with the first active process, when they can be
+  exercised.
+- `config_micm_pbl_transport` is not part of P1; it belongs to the PBL-only
+  stages (code document §6.1).
+
+Verification (GNU gfortran 15.2, double precision, eight ranks, 2026-11-07):
+
+- `testing/chemistry_transport/unit/run_unit_tests.sh`: 4 suites, 66 checks,
+  built with `-O0 -g -fcheck=all`.
+  - Map: 0, 1, 3 and 64 gases; reordered and noncontiguous indices; host-bound
+    H2O, O2 and N2; rejected indices.
+  - Column kernels, the budget schema, and the capability and cache checks.
+  - Transport core with the real stubs: a bitwise no-op with no buffers.
+  - Transport core with link-time test-double processes: PBL-then-CU
+    ordering, single application at mapped indices only, inactive columns,
+    budgets, and repeated setup.
+- `testing/chemistry_transport/test_check_budget.py` (frozen thresholds): 8/8.
+- `testing/chemistry_transport/check_transport_wiring.sh`:
+  - LNOx: NO, NO2 and O3 map to scalars 6, 5 and 4, and physics reports
+    `nMicmTransport = 3` with tendency buffer size 0.
+  - LNOx plus H2O: H2O is excluded as host-bound.
+  - A `MUSICA=false` build: `nMicmTransport = 0` and the run completes.
+- Disabled path: the 60-s and 600-s supercell smoke runs match the pre-P1
+  output exactly on all 20 saved fields at every output time. The 60-s
+  reference is the tracked `smoke-60s-summary.json`; the 600-s reference came
+  from the pre-P1 baseline executable.
+- A fresh whole-branch review found no critical issues. Its two important
+  findings (buffers allocated while disabled, and a shared interface too narrow
+  for both branches) were fixed before the squash. The deferred minor items are
+  listed below.
+
+Deferred to the stage that first runs the pool path (P2/P3):
+
+- Compute `m_d` from the same `rho_zz` time level as the tendency mass. Under
+  `MPAS_OPENACC` the host copy of time level 1 can be stale.
+- Add a test where `nCellsSolve` is smaller than the array extent.
+- Rename the budget masses, or document that they cover active columns only
+  and are not the domain inventory.
+- Add range checks to the budget accessor.
+- Tighten the wiring script's `nMicmTransport` match.
+- Publish the map through the `inout` dimensions argument of
+  `chemistry_init`.
+
+For the convection branch: the shared comments cite this plan, and
+`check_transport_wiring.sh` needs the supercell baseline tooling from
+`chempas-a-pbl`. The unit tests are self-contained.
 
 ## Verification and completion criteria
 
