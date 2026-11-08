@@ -47,7 +47,7 @@ check '(( ${#targets[@]} == 3 ))' "MANIFEST lists the YSU and the two MYNN targe
 check '"$script" > "$work/out1" 2>&1' "pristine files are patched"
 check 'all_hashes 4' "patched files have the recorded hashes"
 check 'grep -q xkzqx "$mmm/bl_ysu.F90"' "YSU export argument is present"
-check 'grep -q "aw_up,ent_up" "$mmm/bl_mynn_subroutines.F90" && grep -q edmf_aw_up "$mmm/bl_mynn.F90"' \
+check 'grep -q "aw_up,ent_up" "$mmm/bl_mynn_subroutines.F90" && grep -q "aw_dn,ent_dn" "$mmm/bl_mynn_subroutines.F90" && grep -q edmf_aw_dn "$mmm/bl_mynn.F90"' \
       "MYNN plume export arguments are present"
 check '"$script" > "$work/out2" 2>&1 && (( $(grep -c "already patched" "$work/out2") == 3 ))' \
       "second application is a no-op"

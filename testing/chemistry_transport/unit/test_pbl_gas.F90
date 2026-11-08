@@ -6,7 +6,7 @@ program test_pbl_gas
    use unit_assert, only: check, finish
    use mpas_atmphys_pbl_gas
    use mpas_atmphys_pbl_diffusion, only: pbl_diffuse_column
-   use mpas_atmphys_pbl_edmf, only: pbl_edmf_updraft_fluxes, pbl_edmf_column
+   use mpas_atmphys_pbl_edmf, only: pbl_edmf_updraft_fluxes, pbl_edmf_downdraft_fluxes, pbl_edmf_column
    use mpas_atmphys_tracer_column, only: relative_mass_residual
 
    implicit none
@@ -15,33 +15,26 @@ program test_pbl_gas
    logical :: supported, ok
    character(len=StrKIND) :: reason
    real(kind=RKIND) :: kzq(nz), m_d(nz), dz(nz), G(nz+1), q(2,nz), q_ref(2,nz), q0(2,nz), rho(nz), qv(nz)
-   real(kind=RKIND) :: aw(nz,2), ent(nz,2), Mu(nz+1,2), Eu(nz,2)
+   real(kind=RKIND) :: aw(nz,2), ent(nz,2), Mu(nz+1,2), Eu(nz,2), awd(nz,1), entd(nz,1), Nd(nz+1,1), Ed(nz,1)
    integer :: nsub
 
-   ! Capability gate (sketch §6.2; MYNN modes open stage by stage in P4, nondefault intervals wait for P5).
-   call pbl_gas_capability('off', 'off', 'none', 0, 0, supported, reason)
+   ! Capability gate (sketch §6.2; nondefault intervals wait for P5).
+   call pbl_gas_capability('off', 'off', 'none', supported, reason)
    call check(supported, 'PBL off is a supported zero-transport case')
-   call pbl_gas_capability('bl_ysu', 'sf_monin_obukhov', 'none', 1, 0, supported, reason)
+   call pbl_gas_capability('bl_ysu', 'sf_monin_obukhov', 'none', supported, reason)
    call check(supported, 'YSU with the Monin-Obukhov surface layer is supported')
-   call pbl_gas_capability('bl_ysu', 'sf_monin_obukhov_rev', 'none', 1, 1, supported, reason)
-   call check(supported, 'YSU with the revised Monin-Obukhov surface layer is supported (MYNN options ignored)')
-   call pbl_gas_capability('bl_ysu', 'off', 'none', 0, 0, supported, reason)
+   call pbl_gas_capability('bl_ysu', 'sf_monin_obukhov_rev', 'none', supported, reason)
+   call check(supported, 'YSU with the revised Monin-Obukhov surface layer is supported')
+   call pbl_gas_capability('bl_ysu', 'off', 'none', supported, reason)
    call check(.not. supported .and. index(reason, 'surface layer') > 0, 'active PBL without a surface layer is rejected')
-   call pbl_gas_capability('bl_ysu', 'sf_monin_obukhov', '00:30:00', 0, 0, supported, reason)
+   call pbl_gas_capability('bl_ysu', 'sf_monin_obukhov', '00:30:00', supported, reason)
    call check(.not. supported .and. index(reason, 'config_pbl_interval') > 0, 'nondefault PBL interval is rejected')
-   call pbl_gas_capability('bl_mynn', 'sf_mynn', 'none', 0, 0, supported, reason)
-   call check(supported, 'MYNN local diffusion (config_mynn_edmf = 0) is supported')
-   call pbl_gas_capability('bl_mynn', 'sf_mynn', 'none', 0, 1, supported, reason)
-   call check(supported, 'MYNN with EDMF off is local diffusion whatever config_mynn_edmf_dd says')
-   call pbl_gas_capability('bl_mynn', 'sf_mynn', 'none', 1, 0, supported, reason)
-   call check(supported, 'MYNN with the updraft EDMF (config_mynn_edmf = 1) is supported')
-   call pbl_gas_capability('bl_mynn', 'sf_mynn', 'none', 1, 1, supported, reason)
-   call check(.not. supported .and. index(reason, 'MYNN downdraft EDMF gas transport is not yet qualified') > 0, &
-              'MYNN downdraft EDMF is rejected until it is qualified')
-   call pbl_gas_capability('bl_mynn', 'sf_mynn', '00:30:00', 0, 0, supported, reason)
+   call pbl_gas_capability('bl_mynn', 'sf_mynn', 'none', supported, reason)
+   call check(supported, 'MYNN is supported (local diffusion, updrafts and downdrafts)')
+   call pbl_gas_capability('bl_mynn', 'sf_mynn', '00:30:00', supported, reason)
    call check(.not. supported .and. index(reason, 'config_pbl_interval') > 0, &
               'nondefault PBL interval is rejected with MYNN')
-   call pbl_gas_capability('bl_other', 'sf_monin_obukhov', 'none', 0, 0, supported, reason)
+   call pbl_gas_capability('bl_other', 'sf_monin_obukhov', 'none', supported, reason)
    call check(.not. supported .and. len_trim(reason) > 0, 'unknown PBL scheme is rejected')
 
    ! Operator cache.
@@ -115,13 +108,39 @@ program test_pbl_gas
    q_ref = q0
    call pbl_diffuse_column(30.0_RKIND, rho/(1.0_RKIND + qv)*dz, G, q_ref)
    call pbl_edmf_updraft_fluxes(aw, ent, rho/(1.0_RKIND + qv), dz, Mu, Eu, ok)
-   call pbl_edmf_column(30.0_RKIND, rho/(1.0_RKIND + qv)*dz, Mu, Eu, q_ref, nsub, ok)
+   call pbl_edmf_column(30.0_RKIND, rho/(1.0_RKIND + qv)*dz, Mu, Eu, Nd(:,1:0), Ed(:,1:0), q_ref, nsub, ok)
    call check(all(transfer(q, [0_I8KIND]) == transfer(q_ref, [0_I8KIND])), &
               'MYNN apply is local diffusion, then the updraft plumes, with the dry density (bitwise)')
    call check(any(q(1,:) /= q0(1,:)) .and. all(q(2,:) == 0.0_RKIND), 'the plumes act; a zero gas stays zero')
    aw(2,1) = -1.0_RKIND
    call pbl_gas_cache_store_mynn_plumes(2, aw, ent, rho, qv, dz, ok)
    call check(.not. ok .and. .not. pbl_gas_active(2), 'a column with invalid plumes is reported and left inactive')
+   aw(2,1) = 0.012_RKIND
+
+   ! MYNN downdrafts (P4c): one downdraft from layer 3 to the face of layer 2.
+   call pbl_gas_cache_setup(nz, 3, nup=2, ndown=1)
+   awd(:,1) = [0.0_RKIND, 0.005_RKIND, 0.004_RKIND, 0.0_RKIND]
+   entd(:,1) = [0.0_RKIND, 0.1_RKIND, 0.0_RKIND, 0.0_RKIND]
+   call pbl_gas_cache_store_mynn_column(1, 0.0_RKIND*kzq, rho, qv, dz, ok)
+   call pbl_gas_cache_store_mynn_plumes(1, 0.0_RKIND*aw, ent, rho, qv, dz, ok, awd, entd)
+   call check(ok .and. pbl_gas_active(1), 'a MYNN column with only a downdraft is active')
+   call pbl_gas_cache_store_mynn_column(2, kzq, rho, qv, dz, ok)
+   call pbl_gas_cache_store_mynn_plumes(2, aw, ent, rho, qv, dz, ok, awd, entd)
+   q = q0
+   call pbl_gas_apply(2, 30.0_RKIND, rho/(1.0_RKIND + qv)*dz, q)
+   call pbl_gas_exchange_faces(kzq, rho/(1.0_RKIND + qv), dz, G, ok)
+   q_ref = q0
+   call pbl_diffuse_column(30.0_RKIND, rho/(1.0_RKIND + qv)*dz, G, q_ref)
+   call pbl_edmf_updraft_fluxes(aw, ent, rho/(1.0_RKIND + qv), dz, Mu, Eu, ok)
+   call pbl_edmf_downdraft_fluxes(awd, entd, rho/(1.0_RKIND + qv), dz, Nd, Ed, ok)
+   call pbl_edmf_column(30.0_RKIND, rho/(1.0_RKIND + qv)*dz, Mu, Eu, Nd, Ed, q_ref, nsub, ok)
+   call check(all(transfer(q, [0_I8KIND]) == transfer(q_ref, [0_I8KIND])), &
+              'MYNN apply is local diffusion, then updrafts and downdrafts together (bitwise)')
+   call pbl_gas_cache_store_mynn_plumes(2, aw, ent, rho, qv, dz, ok)
+   call check(.not. ok .and. .not. pbl_gas_active(2), 'a downdraft cache without downdraft data is reported')
+   awd(1,1) = 0.001_RKIND
+   call pbl_gas_cache_store_mynn_plumes(2, aw, ent, rho, qv, dz, ok, awd, entd)
+   call check(.not. ok .and. .not. pbl_gas_active(2), 'a downdraft into the ground is reported and left inactive')
    call pbl_gas_cache_setup(nz, 3)
 
    kzq(2) = -1.0_RKIND

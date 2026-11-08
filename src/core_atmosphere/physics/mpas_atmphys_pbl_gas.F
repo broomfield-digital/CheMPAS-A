@@ -11,10 +11,10 @@
  use mpas_pool_routines,only: mpas_pool_get_config,mpas_pool_get_dimension
  use mpas_log,only: mpas_log_write
  use mpas_atmphys_pbl_diffusion,only: pbl_diffuse_column
- use mpas_atmphys_pbl_edmf,only: pbl_edmf_updraft_fluxes,pbl_edmf_column
+ use mpas_atmphys_pbl_edmf,only: pbl_edmf_updraft_fluxes,pbl_edmf_downdraft_fluxes,pbl_edmf_column
  use mpas_atmphys_tracer_column,only: tracer_transport_check_capability
  use mpas_atmphys_utilities,only: physics_error_fatal
- use bl_mynn,only: mynn_edmf_nup
+ use bl_mynn,only: mynn_edmf_nup,mynn_edmf_ndown
 
  implicit none
  private
@@ -28,6 +28,7 @@
           pbl_gas_cache_store_mynn_column,  &
           pbl_gas_cache_store_mynn_plumes,  &
           pbl_gas_mynn_updrafts,      &
+          pbl_gas_mynn_downdrafts,    &
           pbl_gas_enabled,            &
           pbl_gas_active,             &
           pbl_gas_apply,              &
@@ -46,19 +47,23 @@
 !(pbl_gas_cache_store_column) before chemistry runs; transport assembly in the same step applies the
 !closed-column backward-Euler diffusion with the model dt to the post-chemistry gases. Only the operator is
 !held, never a gas increment. Supported at the default PBL interval, with a surface layer scheme: YSU (with
-!or without top-down mixing) and MYNN, local diffusion with or without its updraft mass flux (config_mynn_edmf);
-!PBL off is a supported zero-transport case. With the MYNN updrafts the driver also stores each plume's dry mass
-!flux and mass-consistent entrainment (pbl_gas_cache_store_mynn_plumes), and pbl_gas_apply follows the diffusion
-!with the plume transport of mpas_atmphys_pbl_edmf, rebuilt from the post-chemistry gases. MYNN's downdrafts
-!(config_mynn_edmf_dd = 1) and nondefault PBL intervals (P5) stop the model when gas transport is requested.
+!or without top-down mixing) and MYNN, local diffusion with or without its mass-flux scheme (config_mynn_edmf,
+!config_mynn_edmf_dd); PBL off is a supported zero-transport case. With MYNN's mass-flux scheme the driver also
+!stores each updraft's and downdraft's dry mass flux and mass-consistent entrainment
+!(pbl_gas_cache_store_mynn_plumes), and pbl_gas_apply follows the diffusion with the plume transport of
+!mpas_atmphys_pbl_edmf, rebuilt from the post-chemistry gases. Nondefault PBL intervals (P5) stop the model when
+!gas transport is requested.
 
 
  logical,save:: enabled = .false.
  logical,save:: mynn_updrafts = .false.
+ logical,save:: mynn_downdrafts = .false.
  real(kind=RKIND),dimension(:,:),allocatable,save:: g_cache   ! (nVertLevels+1,nCellsSolve)
  logical,dimension(:),allocatable,save:: mask_cache            ! (nCellsSolve)
  real(kind=RKIND),dimension(:,:,:),allocatable,save:: mu_cache ! (nVertLevels+1,nup,nCellsSolve) plume mass flux
  real(kind=RKIND),dimension(:,:,:),allocatable,save:: eu_cache ! (nVertLevels,nup,nCellsSolve) plume entrainment
+ real(kind=RKIND),dimension(:,:,:),allocatable,save:: nd_cache ! (nVertLevels+1,ndown,nCellsSolve) downdraft flux
+ real(kind=RKIND),dimension(:,:,:),allocatable,save:: ed_cache ! (nVertLevels,ndown,nCellsSolve) its entrainment
 
 
  contains
@@ -100,12 +105,17 @@
  edmf_dd = 0
  if(associated(mynn_edmf)   ) edmf    = mynn_edmf
  if(associated(mynn_edmf_dd)) edmf_dd = mynn_edmf_dd
- call pbl_gas_capability(pbl_scheme,sfclayer_scheme,pbl_interval,edmf,edmf_dd,supported,reason)
+ call pbl_gas_capability(pbl_scheme,sfclayer_scheme,pbl_interval,supported,reason)
  call tracer_transport_check_capability('PBL',.true.,pbl_scheme,supported,reason)
  enabled = trim(pbl_scheme) /= 'off'
- mynn_updrafts = trim(pbl_scheme) == 'bl_mynn' .and. edmf == 1
+!MYNN runs its downdrafts only inside its updraft scheme.
+ mynn_updrafts   = trim(pbl_scheme) == 'bl_mynn' .and. edmf == 1
+ mynn_downdrafts = mynn_updrafts .and. edmf_dd == 1
  if(trim(pbl_scheme) == 'bl_mynn') then
-    if(mynn_updrafts) then
+    if(mynn_downdrafts) then
+       call mpas_log_write('[transport] PBL: MYNN gas operator = local diffusion (exch_h) + updraft EDMF ($i plumes)'// &
+                           ' + downdraft EDMF ($i downdrafts)',intArgs=(/mynn_edmf_nup,mynn_edmf_ndown/))
+    elseif(mynn_updrafts) then
        call mpas_log_write('[transport] PBL: MYNN gas operator = local diffusion (exch_h) + updraft EDMF ($i plumes)', &
                            intArgs=(/mynn_edmf_nup/))
     else
@@ -115,24 +125,17 @@
  if(enabled) then
     call mpas_pool_get_dimension(block%dimensions,'nVertLevels',nVertLevels)
     call mpas_pool_get_dimension(block%dimensions,'nCellsSolve',nCellsSolve)
-    if(mynn_updrafts) then
-       call pbl_gas_cache_setup(nVertLevels,nCellsSolve,nup=mynn_edmf_nup)
-    else
-       call pbl_gas_cache_setup(nVertLevels,nCellsSolve)
-    endif
+    call pbl_gas_cache_setup(nVertLevels,nCellsSolve,nup=merge(mynn_edmf_nup,0,mynn_updrafts), &
+                             ndown=merge(mynn_edmf_ndown,0,mynn_downdrafts))
  endif
 
  end subroutine pbl_gas_init
 
 !=================================================================================================================
- pure subroutine pbl_gas_capability(pbl_scheme,sfclayer_scheme,pbl_interval,mynn_edmf,mynn_edmf_dd, &
-                                    supported,reason)
+ pure subroutine pbl_gas_capability(pbl_scheme,sfclayer_scheme,pbl_interval,supported,reason)
 !=================================================================================================================
-!qualified PBL configurations for MICM gas transport. mynn_edmf and mynn_edmf_dd are config_mynn_edmf and
-!config_mynn_edmf_dd (used only for MYNN): MYNN runs its downdrafts only inside its updraft scheme, so with
-!config_mynn_edmf /= 1 MYNN is local diffusion whatever config_mynn_edmf_dd says.
+!qualified PBL configurations for MICM gas transport: YSU (P3) and MYNN in every mass-flux mode (P4).
  character(len=*),intent(in):: pbl_scheme,sfclayer_scheme,pbl_interval
- integer,intent(in):: mynn_edmf,mynn_edmf_dd
  logical,intent(out):: supported
  character(len=*),intent(out):: reason
 
@@ -144,12 +147,7 @@
     case('bl_ysu')
        supported = .true.
     case('bl_mynn')
-       if(mynn_edmf /= 1 .or. mynn_edmf_dd /= 1) then
-          supported = .true.
-       else
-          reason = 'MYNN downdraft EDMF gas transport is not yet qualified (P4c of docs/plans/pbl-transport.md); '// &
-                   'set config_mynn_edmf_dd = 0'
-       endif
+       supported = .true.
     case default
        reason = 'no MICM gas adapter for this PBL scheme'
  end select
@@ -230,17 +228,19 @@
  end subroutine pbl_gas_exchange_faces
 
 !=================================================================================================================
- subroutine pbl_gas_cache_setup(nlevels,ncells,nup)
+ subroutine pbl_gas_cache_setup(nlevels,ncells,nup,ndown)
 !=================================================================================================================
-!allocate the per-column operator cache, with nup updraft plumes per column when present and positive; every
-!column starts inactive.
+!allocate the per-column operator cache, with nup updraft plumes and ndown downdrafts per column when present and
+!positive; every column starts inactive.
  integer,intent(in):: nlevels,ncells
- integer,intent(in),optional:: nup
+ integer,intent(in),optional:: nup,ndown
 
  if(allocated(g_cache)   ) deallocate(g_cache)
  if(allocated(mask_cache)) deallocate(mask_cache)
  if(allocated(mu_cache)  ) deallocate(mu_cache)
  if(allocated(eu_cache)  ) deallocate(eu_cache)
+ if(allocated(nd_cache)  ) deallocate(nd_cache)
+ if(allocated(ed_cache)  ) deallocate(ed_cache)
  allocate(g_cache(nlevels+1,ncells),mask_cache(ncells))
  g_cache(:,:)  = 0._RKIND
  mask_cache(:) = .false.
@@ -249,6 +249,13 @@
        allocate(mu_cache(nlevels+1,nup,ncells),eu_cache(nlevels,nup,ncells))
        mu_cache(:,:,:) = 0._RKIND
        eu_cache(:,:,:) = 0._RKIND
+    endif
+ endif
+ if(present(ndown)) then
+    if(ndown > 0) then
+       allocate(nd_cache(nlevels+1,ndown,ncells),ed_cache(nlevels,ndown,ncells))
+       nd_cache(:,:,:) = 0._RKIND
+       ed_cache(:,:,:) = 0._RKIND
     endif
  endif
 
@@ -297,20 +304,30 @@
  end subroutine pbl_gas_cache_store_mynn_column
 
 !=================================================================================================================
- subroutine pbl_gas_cache_store_mynn_plumes(iCell,aw_up,ent_up,rho,qv,dz,ok)
+ subroutine pbl_gas_cache_store_mynn_plumes(iCell,aw_up,ent_up,rho,qv,dz,ok,aw_dn,ent_dn)
 !=================================================================================================================
 !store this step's MYNN updraft plumes for column iCell, after pbl_gas_cache_store_mynn_column: per plume, the
 !exported area-weighted velocity aw_up(k,:) on the top face of layer k and mixing fraction ent_up(k,:), with the
-!dry density rho/(1+qv) (pbl_edmf_updraft_fluxes). An invalid column (ok = .false.) is left inactive; the caller
-!decides whether to stop.
+!dry density rho/(1+qv) (pbl_edmf_updraft_fluxes); and, when the cache holds downdrafts, aw_dn(k,:) (downward,
+!bottom face of layer k) and ent_dn(k,:) (pbl_edmf_downdraft_fluxes), which must then be present. An invalid
+!column (ok = .false.) is left inactive; the caller decides whether to stop.
  integer,intent(in):: iCell
  real(kind=RKIND),intent(in),dimension(:,:):: aw_up,ent_up   ! (nVertLevels,nup)
  real(kind=RKIND),intent(in),dimension(:):: rho,qv,dz
  logical,intent(out):: ok
+ real(kind=RKIND),intent(in),dimension(:,:),optional:: aw_dn,ent_dn   ! (nVertLevels,ndown)
+ logical:: ok_dn
 
  call pbl_edmf_updraft_fluxes(aw_up,ent_up,rho/(1._RKIND+qv),dz,mu_cache(:,:,iCell),eu_cache(:,:,iCell),ok)
+ if(allocated(nd_cache)) then
+    ok_dn = present(aw_dn) .and. present(ent_dn)
+    if(ok_dn) call pbl_edmf_downdraft_fluxes(aw_dn,ent_dn,rho/(1._RKIND+qv),dz,nd_cache(:,:,iCell), &
+                                             ed_cache(:,:,iCell),ok_dn)
+    ok = ok .and. ok_dn
+ endif
  if(ok) then
     mask_cache(iCell) = mask_cache(iCell) .or. any(mu_cache(:,:,iCell) > 0._RKIND)
+    if(allocated(nd_cache)) mask_cache(iCell) = mask_cache(iCell) .or. any(nd_cache(:,:,iCell) > 0._RKIND)
  else
     mask_cache(iCell) = .false.
  endif
@@ -325,6 +342,15 @@
  pbl_gas_mynn_updrafts = enabled .and. mynn_updrafts
 
  end function pbl_gas_mynn_updrafts
+
+!=================================================================================================================
+ logical function pbl_gas_mynn_downdrafts()
+!=================================================================================================================
+!true when gas transport also uses MYNN's downdrafts, which the PBL driver must then export.
+
+ pbl_gas_mynn_downdrafts = enabled .and. mynn_downdrafts
+
+ end function pbl_gas_mynn_downdrafts
 
 !=================================================================================================================
  logical function pbl_gas_enabled()
@@ -351,17 +377,24 @@
  real(kind=RKIND),intent(in):: dt                       ! model time step [s] (not YSU's 2*dt)
  real(kind=RKIND),intent(in),dimension(:):: m_d         ! dry layer mass [kg m-2]
  real(kind=RKIND),intent(inout),dimension(:,:):: q      ! (nTransport,nVertLevels), post-chemistry
+ real(kind=RKIND),dimension(size(m_d)+1,0):: no_flux     ! no downdrafts
+ real(kind=RKIND),dimension(size(m_d),0):: no_entrainment
+ logical:: ok,plumes
  integer:: nsub
- logical:: ok
 
  call pbl_diffuse_column(dt,m_d,g_cache(:,iCell),q)
- if(allocated(mu_cache)) then
-    if(any(mu_cache(:,:,iCell) > 0._RKIND)) then
-       call pbl_edmf_column(dt,m_d,mu_cache(:,:,iCell),eu_cache(:,:,iCell),q,nsub,ok)
-       if(.not.ok) call physics_error_fatal('[transport] PBL: MYNN updraft operator for MICM gases needs more '// &
-                                            'than 1e4 substeps (non-finite or implausible plume mass flux)')
-    endif
+ if(.not.allocated(mu_cache)) return
+ plumes = any(mu_cache(:,:,iCell) > 0._RKIND)
+ if(allocated(nd_cache)) plumes = plumes .or. any(nd_cache(:,:,iCell) > 0._RKIND)
+ if(.not.plumes) return
+ if(allocated(nd_cache)) then
+    call pbl_edmf_column(dt,m_d,mu_cache(:,:,iCell),eu_cache(:,:,iCell),nd_cache(:,:,iCell),ed_cache(:,:,iCell), &
+                         q,nsub,ok)
+ else
+    call pbl_edmf_column(dt,m_d,mu_cache(:,:,iCell),eu_cache(:,:,iCell),no_flux,no_entrainment,q,nsub,ok)
  endif
+ if(.not.ok) call physics_error_fatal('[transport] PBL: MYNN mass-flux operator for MICM gases needs more '// &
+                                      'than 1e4 substeps (non-finite or implausible plume mass flux)')
 
  end subroutine pbl_gas_apply
 
@@ -373,8 +406,11 @@
  if(allocated(mask_cache)) deallocate(mask_cache)
  if(allocated(mu_cache)  ) deallocate(mu_cache)
  if(allocated(eu_cache)  ) deallocate(eu_cache)
- enabled       = .false.
- mynn_updrafts = .false.
+ if(allocated(nd_cache)  ) deallocate(nd_cache)
+ if(allocated(ed_cache)  ) deallocate(ed_cache)
+ enabled         = .false.
+ mynn_updrafts   = .false.
+ mynn_downdrafts = .false.
 
  end subroutine pbl_gas_finalize
 

@@ -10,7 +10,7 @@ module mynn_column
 
    implicit none
    private
-   public :: column_state, column_output, make_column, run_mynn, nz, kme
+   public :: column_state, column_output, make_column, run_mynn, cloud_top_layer, nz, kme
 
    integer, parameter :: nz = 40, kme = nz + 1
    real(RKIND), parameter :: g = 9.81_RKIND, rd = 287.0_RKIND, rv = 461.6_RKIND, cp = 1004.5_RKIND
@@ -30,13 +30,19 @@ module mynn_column
 contains
 
    subroutine make_column(regime, moist, col)
-      ! regime: 'stable' (theta rising 6 K/km, downward heat flux) or 'convective' (1 km mixed layer
-      ! under 4 K/km, 250 W m-2 upward heat flux). moist = .false. gives qv = 0, so moist and dry
-      ! density coincide.
+      ! regime: 'stable' (theta rising 6 K/km, downward heat flux), 'convective' (1 km mixed layer
+      ! under 4 K/km, 250 W m-2 upward heat flux) or 'cloudtop' (a 1 km moist mixed layer, total water
+      ! 9 g/kg, saturated in its upper part and capped by a 6 K inversion, with radiative cooling at the
+      ! cloud top: a stratocumulus-topped layer, which triggers MYNN's downdrafts; always moist). The
+      ! cloud-top cooling (6e-3 K/s in one layer) and friction velocity (1 m/s) are deliberately strong:
+      ! the pinned MYNN slows every downdraft by 1.25*dz/200 m/s per level whatever its buoyancy (its
+      ! limiter uses MIN(1.25*dz/200, -2) where a bound of -2 m/s is meant), so a downdraft survives
+      ! MYNN's two-level minimum only when its starting speed, about 0.6*wst_dd, exceeds that.
+      ! moist = .false. gives qv = 0, so moist and dry density coincide.
       character(len=*), intent(in) :: regime
       logical, intent(in) :: moist
       type(column_state), intent(out) :: col
-      real(RKIND) :: pii(nz+1), kap, thv, z
+      real(RKIND) :: pii(nz+1), kap, thv, z, es, qsat
       integer :: k
 
       kap = rd/cp
@@ -51,10 +57,15 @@ contains
          col%th = 300.0_RKIND + 6.0e-3_RKIND*col%zc
       case ('convective')
          col%th = merge(300.0_RKIND, 300.0_RKIND + 4.0e-3_RKIND*(col%zc - 1000.0_RKIND), col%zc < 1000.0_RKIND)
+      case ('cloudtop')
+         col%th = merge(290.0_RKIND, 296.0_RKIND + 4.0e-3_RKIND*(col%zc - 1000.0_RKIND), col%zc < 1000.0_RKIND)
       case default
          error stop 'make_column: unknown regime'
       end select
-      if (moist) then
+      if (regime == 'cloudtop') then
+         ! total water, split into vapour and cloud below; dry above the inversion
+         col%qv = merge(9.0e-3_RKIND, 3.0e-3_RKIND*exp(-(col%zc - 1000.0_RKIND)/1500.0_RKIND), col%zc < 1000.0_RKIND)
+      else if (moist) then
          col%qv = 8.0e-3_RKIND*exp(-col%zc/2500.0_RKIND)
       else
          col%qv = 0.0_RKIND
@@ -73,6 +84,21 @@ contains
          col%tt(k) = col%th(k)*col%exner(k)
          col%rho(k) = col%p(k)/(rd*col%tt(k)*(1.0_RKIND + 0.608_RKIND*col%qv(k)))
       end do
+      if (regime == 'cloudtop') then
+         ! saturation adjustment of the mixed layer (Tetens), and cooling at the cloud top
+         do k = 1, nz
+            es = 611.2_RKIND*exp(17.67_RKIND*(col%tt(k) - 273.15_RKIND)/(col%tt(k) - 29.65_RKIND))
+            qsat = 0.622_RKIND*es/(col%p(k) - 0.378_RKIND*es)
+            if (col%zc(k) < 1000.0_RKIND .and. col%qv(k) > qsat) then
+               col%qc(k) = col%qv(k) - qsat
+               col%qv(k) = qsat
+            end if
+         end do
+         do k = 1, nz-1
+            if (col%qc(k) > 0.0_RKIND .and. col%zc(k) < 1000.0_RKIND .and. col%zc(k+1) >= 1000.0_RKIND) &
+               col%rthraten(k) = -6.0e-3_RKIND
+         end do
+      end if
       col%znt = 0.1_RKIND
       col%wspd = sqrt(col%u(1)**2 + col%v(1)**2)
       col%qsfc = col%qv(1)
@@ -82,6 +108,11 @@ contains
          col%ust = 0.2_RKIND
          col%rmol = 0.04_RKIND
          col%ts = col%tt(1) - 3.0_RKIND
+      else if (regime == 'cloudtop') then
+         col%hfx = 100.0_RKIND
+         col%ust = 1.0_RKIND
+         col%rmol = -0.005_RKIND
+         col%ts = col%tt(1) + 1.0_RKIND
       else
          col%hfx = 250.0_RKIND
          col%ust = 0.4_RKIND
@@ -89,9 +120,10 @@ contains
          col%ts = col%tt(1) + 5.0_RKIND
       end if
       col%qfx = merge(1.0e-4_RKIND, 0.0_RKIND, moist)
+      if (regime == 'cloudtop') col%qfx = 3.0e-5_RKIND
    end subroutine make_column
 
-   subroutine run_mynn(col, edmf, edmf_dd, output, delt, out, qoz, rqoz, nwfa, rnwfa, aw_up, ent_up)
+   subroutine run_mynn(col, edmf, edmf_dd, output, delt, out, qoz, rqoz, nwfa, rnwfa, aw_up, ent_up, aw_dn, ent_dn)
       ! One MYNN step (initflag = 1: MYNN initializes its turbulence from the column first). nwfa, when
       ! given, switches on MYNN's mixing of water-friendly aerosol (MYNN reports that tendency only with
       ! ice-friendly aerosol on as well, so nifa = nwfa). The pinned MYNN mixes ozone but reports a zero
@@ -105,6 +137,8 @@ contains
       ! MYNN's per-plume updraft export (P4b), passed on as the PBL driver does: an allocatable array
       ! (1,kme,1,mynn_edmf_nup), absent, or not allocated
       real(RKIND), dimension(:,:,:,:), allocatable, intent(inout), optional :: aw_up, ent_up
+      ! and the per-downdraft export (P4c), (1,kme,1,mynn_edmf_ndown)
+      real(RKIND), dimension(:,:,:,:), allocatable, intent(inout), optional :: aw_dn, ent_dn
 
       real(RKIND), dimension(1,kme,1) :: dz, u, w, v, th, tt, p, exner, rho, qv, rthraten, qc, qi, qs, qoz3, &
                                          nc, ni, nifa, nwfa3, nbca, cldfra_bl, qc_bl, qi_bl, el_pbl, qke, &
@@ -197,6 +231,16 @@ contains
       pblh = 0.0_RKIND
       kpbl = 1
       ktop_plume = 0
+      maxwidth = 0.0_RKIND
+      maxmf = 0.0_RKIND
+      ztop_plume = 0.0_RKIND
+      exch_h = 0.0_RKIND
+      exch_m = 0.0_RKIND
+      dqke = 0.0_RKIND
+      qwt = 0.0_RKIND
+      qshear = 0.0_RKIND
+      qbuoy = 0.0_RKIND
+      qdiss = 0.0_RKIND
 
       call mynn_bl_driver( &
            f_qc=.true., f_qi=.false., f_qs=.false., f_qoz=present(qoz), f_nc=.false., f_ni=.false., &
@@ -212,7 +256,7 @@ contains
            rnbcablten=rnbcablten, rqozblten=rqozblten, edmf_a=edmf_a, edmf_w=edmf_w, edmf_qt=edmf_qt, &
            edmf_thl=edmf_thl, edmf_ent=edmf_ent, edmf_qc=edmf_qc, sub_thl=sub_thl, sub_sqv=sub_sqv, &
            det_thl=det_thl, det_sqv=det_sqv, exch_h=exch_h, exch_m=exch_m, edmf_aw_up=aw_up, &
-           edmf_ent_up=ent_up, qke=qke, qwt=qwt, &
+           edmf_ent_up=ent_up, edmf_aw_dn=aw_dn, edmf_ent_dn=ent_dn, qke=qke, qwt=qwt, &
            qshear=qshear, qbuoy=qbuoy, qdiss=qdiss, sh3d=sh3d, sm3d=sm3d, spp_pbl=0, &
            do_restart=.false., do_DAcycling=.false., initflag=1, bl_mynn_tkeadvect=.false., &
            bl_mynn_tkebudget=0, bl_mynn_cloudpdf=2, bl_mynn_mixlength=2, bl_mynn_closure=2.5_RKIND, &
@@ -241,6 +285,19 @@ contains
       if (present(rqoz)) rqoz = out%rqoz
       if (present(rnwfa)) rnwfa = out%rnwfa
    end subroutine run_mynn
+
+   integer function cloud_top_layer(col)
+      ! highest layer with cloud water (0 if none)
+      type(column_state), intent(in) :: col
+      integer :: k
+      cloud_top_layer = 0
+      do k = nz, 1, -1
+         if (col%qc(k) > 0.0_RKIND) then
+            cloud_top_layer = k
+            return
+         end if
+      end do
+   end function cloud_top_layer
 
    subroutine fill(a, column)
       real(RKIND), intent(out) :: a(1,kme,1)

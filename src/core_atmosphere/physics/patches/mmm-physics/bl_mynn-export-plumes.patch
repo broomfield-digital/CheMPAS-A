@@ -1,54 +1,62 @@
 --- a/physics_mmm/bl_mynn.F90
 +++ b/physics_mmm/bl_mynn.F90
-@@ -14,7 +14,8 @@
+@@ -14,7 +14,9 @@
   private
   public:: bl_mynn_init,     &
            bl_mynn_finalize, &
 -          bl_mynn_run
 +          bl_mynn_run,      &
-+          mynn_edmf_nup
++          mynn_edmf_nup,    &
++          mynn_edmf_ndown
  
  
   contains
-@@ -171,6 +172,7 @@
+@@ -171,6 +173,8 @@
               frp               , vdep               ,                      &
  #endif
               its, ite , kts , kte , kme , errmsg , errflg                  &
-+            ,edmf_aw_up        , edmf_ent_up                                &
++            ,edmf_aw_up        , edmf_ent_up        , edmf_aw_dn         , &
++             edmf_ent_dn                                                    &
              )    
  
  !=================================================================================================================
-@@ -321,6 +323,12 @@
+@@ -321,6 +325,15 @@
      exch_h,      &!
      exch_m        !
  
 +!CheMPAS-A: per-plume updraft export for passive-gas transport (dmp_mf aw_up, ent_up), (its:ite,kts:kte,
-+!mynn_edmf_nup); zero where the updraft scheme is off or does not transport.
++!mynn_edmf_nup), and per-downdraft export (ddmf_jpl aw_dn, ent_dn), (its:ite,kts:kte,mynn_edmf_ndown); zero
++!where the scheme is off or does not transport.
 + real(kind=kind_phys),intent(out),dimension(its:,kts:,:),optional:: &
 +    edmf_aw_up,  &!
-+    edmf_ent_up   !
++    edmf_ent_up, &!
++    edmf_aw_dn,  &!
++    edmf_ent_dn   !
 +
   real(kind=kind_phys),intent(out),dimension(its:,:),optional:: &
      dqke,        &!
      qwt,         &!
-@@ -391,6 +399,7 @@
+@@ -391,6 +404,8 @@
  
  !local 1D output arguments:
   real(kind=kind_phys):: maxwidth1,maxmf1,ztop_plume1
 + real(kind=kind_phys),dimension(kts:kte,mynn_edmf_nup):: aw_up1,ent_up1
++ real(kind=kind_phys),dimension(kts:kte,mynn_edmf_ndown):: aw_dn1,ent_dn1
   real(kind=kind_phys),dimension(kts:kte):: exch_h1,exch_m1
  
   real(kind=kind_phys),dimension(kts:kte):: dqke1,qwt1,qshear1,qbuoy1,qdiss1
-@@ -875,6 +884,8 @@
+@@ -875,6 +890,10 @@
  
  
      !--- calls subroutine dmp_mf():
 +    aw_up1  = 0._kind_phys
 +    ent_up1 = 0._kind_phys
++    aw_dn1  = 0._kind_phys
++    ent_dn1 = 0._kind_phys
      if(bl_mynn_edmf) then
         call dmp_mf( i,                             &
                  kts,kte,delt,zw,dz1,p1,rho1,       &
-@@ -914,7 +925,8 @@
+@@ -914,7 +933,8 @@
                  psig_shcu,                         &
                  maxwidth1,ktop_plume1,             &
                  maxmf1,ztop_plume1,                &
@@ -58,7 +66,17 @@
  
         if(bl_mynn_edmf_dd) then
            call ddmf_jpl(kts,kte,delt,zw,dz1,p1,         &
-@@ -1234,6 +1246,12 @@
+@@ -929,7 +949,8 @@
+                     sd_awqv1,sd_awqc1,sd_awu1,sd_awv1,  &
+                     sd_awqke1,                          &
+                     qc_bl1,cldfra_bl1,                  &
+-                    rthraten)
++                    rthraten,                           &
++                    aw_dn=aw_dn1,ent_dn=ent_dn1)
+        endif
+     endif
+ 
+@@ -1234,6 +1255,18 @@
         exch_h(i,k) = exch_h1(k)
         exch_m(i,k) = exch_m1(k)
      enddo
@@ -66,6 +84,12 @@
 +       do k = kts,kte
 +          edmf_aw_up(i,k,:)  = aw_up1(k,:)
 +          edmf_ent_up(i,k,:) = ent_up1(k,:)
++       enddo
++    endif
++    if(present(edmf_aw_dn) .and. present(edmf_ent_dn)) then
++       do k = kts,kte
++          edmf_aw_dn(i,k,:)  = aw_dn1(k,:)
++          edmf_ent_dn(i,k,:) = ent_dn1(k,:)
 +       enddo
 +    endif
  

@@ -14,11 +14,11 @@
  use mpas_atmphys_constants
  use mpas_atmphys_vars
 
- use bl_mynn,only: bl_mynn_init,mynn_edmf_nup
+ use bl_mynn,only: bl_mynn_init,mynn_edmf_nup,mynn_edmf_ndown
  use module_bl_mynn,only: mynn_bl_driver
  use module_bl_ysu
  use mpas_atmphys_pbl_gas,only: pbl_gas_enabled,pbl_gas_cache_store_moist_column,pbl_gas_cache_store_mynn_column, &
-                                pbl_gas_cache_store_mynn_plumes,pbl_gas_mynn_updrafts
+                                pbl_gas_cache_store_mynn_plumes,pbl_gas_mynn_updrafts,pbl_gas_mynn_downdrafts
  use mpas_atmphys_utilities,only: physics_error_fatal
 
  implicit none
@@ -32,9 +32,10 @@
 !(an unallocated array is passed as an absent optional argument):
  real(kind=RKIND),dimension(:,:,:),allocatable:: kzq_gas_p
 
-!MYNN per-plume updraft export for MICM gas transport (area-weighted velocity and mixing fraction), allocated
-!only when gas transport uses MYNN's updrafts:
+!MYNN per-plume updraft and per-downdraft export for MICM gas transport (area-weighted velocity and mixing
+!fraction), allocated only when gas transport uses MYNN's updrafts (downdrafts):
  real(kind=RKIND),dimension(:,:,:,:),allocatable:: awup_gas_p,entup_gas_p
+ real(kind=RKIND),dimension(:,:,:,:),allocatable:: awdn_gas_p,entdn_gas_p
 
 !MPAS driver for parameterization of Planetary Boundary Layer (PBL) processes.
 !Laura D. Fowler (send comments to laura@ucar.edu).
@@ -155,6 +156,10 @@
           if(.not.allocated(awup_gas_p) ) allocate(awup_gas_p(ims:ime,kms:kme,jms:jme,mynn_edmf_nup) )
           if(.not.allocated(entup_gas_p)) allocate(entup_gas_p(ims:ime,kms:kme,jms:jme,mynn_edmf_nup))
        endif
+       if(pbl_gas_mynn_downdrafts()) then
+          if(.not.allocated(awdn_gas_p) ) allocate(awdn_gas_p(ims:ime,kms:kme,jms:jme,mynn_edmf_ndown) )
+          if(.not.allocated(entdn_gas_p)) allocate(entdn_gas_p(ims:ime,kms:kme,jms:jme,mynn_edmf_ndown))
+       endif
        if(.not.allocated(kbl_plume_p) ) allocate(kbl_plume_p(ims:ime,jms:jme)         )
        if(.not.allocated(dx_p)        ) allocate(dx_p(ims:ime,jms:jme)                )
        if(.not.allocated(ch_p)        ) allocate(ch_p(ims:ime,jms:jme)                )
@@ -267,6 +272,8 @@
     case("bl_mynn")
        if(allocated(awup_gas_p)  ) deallocate(awup_gas_p  )
        if(allocated(entup_gas_p) ) deallocate(entup_gas_p )
+       if(allocated(awdn_gas_p)  ) deallocate(awdn_gas_p  )
+       if(allocated(entdn_gas_p) ) deallocate(entdn_gas_p )
        if(allocated(kbl_plume_p) ) deallocate(kbl_plume_p )
        if(allocated(dx_p)        ) deallocate(dx_p        )
        if(allocated(ch_p)        ) deallocate(ch_p        )
@@ -950,7 +957,8 @@
                   edmf_thl   = edmfthl_p    , edmf_ent   = edmfent_p    , edmf_qc     = edmfqc_p        , &
                   sub_thl    = subthl_p     , sub_sqv    = subqv_p      , det_thl     = detthl_p        , &
                   det_sqv    = detqv_p      , exch_h     = kzh_p        , exch_m      = kzm_p           , &
-                  edmf_aw_up = awup_gas_p   , edmf_ent_up = entup_gas_p ,                                   &
+                  edmf_aw_up = awup_gas_p   , edmf_ent_up = entup_gas_p , edmf_aw_dn  = awdn_gas_p      , &
+                  edmf_ent_dn = entdn_gas_p ,                                                             &
                   qke        = qke_p        , qwt        = qwt_p        , qshear      = qshear_p        , &
                   qbuoy      = qbuoy_p      , qdiss      = qdiss_p      , sh3d        = sh3d_p          , &
                   sm3d       = sm3d_p       , spp_pbl    = spp_pbl      , pattern_spp = pattern_spp_pbl , &
@@ -1018,9 +1026,9 @@
 !=================================================================================================================
  subroutine pbl_gas_store_mynn(its,ite)
 !=================================================================================================================
-!hand this step's MYNN scalar exchange (exch_h, on the bottom face of each layer) and, with its updraft scheme,
-!its per-plume export to the MICM gas PBL transport, per owned column; rho_p includes water vapor, and the stored
-!operator uses the dry density.
+!hand this step's MYNN scalar exchange (exch_h, on the bottom face of each layer) and, with its mass-flux scheme,
+!its per-updraft and per-downdraft export to the MICM gas PBL transport, per owned column; rho_p includes water
+!vapor, and the stored operator uses the dry density.
  integer,intent(in):: its,ite
  logical:: ok
  integer:: i,j
@@ -1031,13 +1039,17 @@
                                          dz_p(i,kts:kte,j),ok)
     if(.not.ok) call physics_error_fatal('[transport] PBL: invalid MYNN exchange operator for MICM gases '// &
                                          '(negative or non-finite exchange, or nonpositive layer mass)')
-    if(allocated(awup_gas_p)) then
+    if(allocated(awdn_gas_p)) then
+       call pbl_gas_cache_store_mynn_plumes(i,awup_gas_p(i,kts:kte,j,:),entup_gas_p(i,kts:kte,j,:), &
+                                            rho_p(i,kts:kte,j),qv_p(i,kts:kte,j),dz_p(i,kts:kte,j),ok, &
+                                            awdn_gas_p(i,kts:kte,j,:),entdn_gas_p(i,kts:kte,j,:))
+    elseif(allocated(awup_gas_p)) then
        call pbl_gas_cache_store_mynn_plumes(i,awup_gas_p(i,kts:kte,j,:),entup_gas_p(i,kts:kte,j,:), &
                                             rho_p(i,kts:kte,j),qv_p(i,kts:kte,j),dz_p(i,kts:kte,j),ok)
-       if(.not.ok) call physics_error_fatal('[transport] PBL: invalid MYNN updraft plumes for MICM gases '// &
-                                            '(negative or non-finite flux, mixing fraction outside [0,1), '// &
-                                            'or flux through the model top)')
     endif
+    if(.not.ok) call physics_error_fatal('[transport] PBL: invalid MYNN mass-flux plumes for MICM gases '// &
+                                         '(negative or non-finite flux, mixing fraction outside [0,1), '// &
+                                         'or flux through the model top or into the ground)')
  enddo
  enddo
 

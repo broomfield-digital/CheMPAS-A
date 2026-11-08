@@ -79,9 +79,17 @@ fi
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
+# MMM-physics' DDMF_JPL (pinned revision) reads DOWNA(k-1) and ENT(k-1) below their lower bounds in the
+# loop that averages its downdraft diagnostics (edmf_*_dd, which MPAS does not use), so array bounds are not
+# checked in that one external file; every other check stays on.
+nobounds=(bl_mynn_subroutines.F90)
 compile() {
+    local flags=$FFLAGS
+    if [[ " ${nobounds[*]} " == *" $(basename "$1") "* ]] && [[ $FFLAGS == *-fcheck=all* ]]; then
+        flags="$FFLAGS -fcheck=all,no-bounds"
+    fi
     # shellcheck disable=SC2086
-    $FC $CPPFLAGS $FFLAGS -c "$1" $CPPINCLUDES -I"$framework" -I.
+    $FC $CPPFLAGS $flags -c "$1" $CPPINCLUDES -I"$framework" -I.
 }
 
 failed=0

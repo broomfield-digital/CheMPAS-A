@@ -1,19 +1,22 @@
 --- a/physics_mmm/bl_mynn_subroutines.F90
 +++ b/physics_mmm/bl_mynn_subroutines.F90
-@@ -350,7 +350,11 @@ MODULE bl_mynn_subroutines
+@@ -350,7 +350,14 @@ MODULE bl_mynn_subroutines
             phih,                     &
             phim,                     &
             retrieve_exchange_coeffs, &
 -           scale_aware
 +           scale_aware,              &
-+           mynn_edmf_nup
++           mynn_edmf_nup,            &
++           mynn_edmf_ndown
 +
-+!CheMPAS-A: number of MYNN updraft plumes (DMP_mf), for the plume export used by passive-gas transport.
++!CheMPAS-A: number of MYNN updraft plumes (DMP_mf) and downdrafts (DDMF_JPL), for the plume export used by
++!passive-gas transport.
 +  integer, parameter :: mynn_edmf_nup = 8
++  integer, parameter :: mynn_edmf_ndown = 5
  
  !===================================================================
  ! From here on, these are MYNN-specific parameters:
-@@ -4674,7 +4678,9 @@ ENDIF
+@@ -4674,7 +4681,9 @@ ENDIF
              ! output info
                   & maxwidth,ktop,maxmf,ztop,    &
              ! inputs for stochastic perturbations
@@ -24,7 +27,7 @@
  
    ! inputs:
       integer, intent(in) :: ii
-@@ -4715,9 +4721,15 @@ ENDIF
+@@ -4715,9 +4724,15 @@ ENDIF
       real(kind_phys),dimension(kts:kte), intent(inout) ::              &
            &qc_bl1d,cldfra_bl1d,qc_bl1d_old,cldfra_bl1d_old
  
@@ -41,7 +44,7 @@
    !------------- local variables -------------------
    ! updraft properties defined on interfaces (k=1 is the top of the
    ! first model layer
-@@ -4833,6 +4845,8 @@ ENDIF
+@@ -4833,6 +4848,8 @@ ENDIF
  !     print *,'pblh',pblh
  
  ! Initialize individual updraft properties
@@ -50,7 +53,7 @@
    UPW=0.
    UPTHL=0.
    UPTHV=0.
-@@ -5459,6 +5473,16 @@ IF (nup2 > 0) THEN
+@@ -5459,6 +5476,16 @@ IF (nup2 > 0) THEN
     ENDIF
     !Print*,"adjustment=",adjustment," fluxportion=",fluxportion," flt=",flt
  
@@ -67,3 +70,49 @@
     !Calculate mean updraft properties for output:
     !all edmf_* variables at k=1 correspond to the interface at top of first model layer
     do k=kts,kte-1
+@@ -5899,7 +5926,9 @@ SUBROUTINE DDMF_JPL(kts,kte,dt,zw,dz,p,              &
+               &sd_awqv,sd_awqc,sd_awu,sd_awv,        &
+               &sd_awqke,                             &
+               &qc_bl1d,cldfra_bl1d,                  &
+-              &rthraten                              )
++              &rthraten,                             &
++              ! CheMPAS-A: optional per-downdraft export for passive-gas transport
++              &aw_dn,ent_dn                          )
+ 
+         integer, intent(in) :: KTS,KTE,KPBL
+         real(kind_phys), dimension(kts:kte), intent(in) ::            &
+@@ -5922,7 +5951,12 @@ SUBROUTINE DDMF_JPL(kts,kte,dt,zw,dz,p,              &
+         real(kind_phys), dimension(kts:kte), intent(in) ::            &
+             qc_bl1d, cldfra_bl1d
+ 
+-        integer, parameter:: ndown = 5
++        integer, parameter:: ndown = mynn_edmf_ndown
++
++  ! CheMPAS-A outputs, per downdraft: area-weighted speed DOWNA*(-DOWNW) [m s-1], positive downward, on the
++  ! bottom face of layer k (the face where sd_aw(k) stores it), and the entrainment fraction ENT*dz used to
++  ! mix the downdraft through layer k (zero unless it enters layer k from above and leaves through the bottom).
++        real(kind_phys), dimension(kts:kte,1:ndown), intent(out), optional :: aw_dn,ent_dn
+   ! draw downdraft starting height randomly between cloud base and cloud top
+         integer,         dimension(1:NDOWN) :: DD_initK
+         real(kind_phys), dimension(1:NDOWN) :: randNum
+@@ -6228,6 +6262,20 @@ SUBROUTINE DDMF_JPL(kts,kte,dt,zw,dz,p,              &
+    DOWNW(1,:) = 0. !make sure downdraft does not go to the surface
+    DOWNA(1,:) = 0.
+ 
++   !CheMPAS-A: per-downdraft export (the downdraft terms of sd_aw and the mixing fractions)
++   if (present(aw_dn) .and. present(ent_dn)) then
++      aw_dn  = 0.
++      ent_dn = 0.
++      do i=1,ndown
++         do k=kts+1,kte
++            aw_dn(k,i) = DOWNA(k,i)*max(-DOWNW(k,i),0.)
++         enddo
++         do k=kts+1,kte-1
++            if (aw_dn(k,i) > 0. .and. aw_dn(k+1,i) > 0.) ent_dn(k,i) = ENT(k,i)*dz(k)
++         enddo
++      enddo
++   endif
++
+    ! Combine both moist and dry plume, write as one averaged plume
+    ! Even though downdraft starts at different height, average all up to qlTop
+    DO k=qlTop,KTS,-1
