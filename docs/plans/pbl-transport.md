@@ -152,6 +152,8 @@ deterministic application, and retained license notices. An edited ignored
   [P4](#p4-mynn-gas-pbl-transport-implemented).
 - [ ] P5: nondefault interval contract, cache restart behavior, MPI/halo checks,
   and coupled PBL/convection/chemistry qualification after #41 is available.
+  Planned as P5a (PBL-only) and P5b (coupled, after #41); see the
+  [P5 plan](#p5-plan-pbl-intervals-restart-and-mpi-pbl-only-part).
 - [ ] P6: GCC/gfortran and Clang/Flang eight-rank results, supported-configuration
   table, reproducible fixtures, and user configuration documentation.
 
@@ -825,6 +827,99 @@ before a comment correction), with GNU on eight ranks, kept outside the reposito
   producers, and its error message names only the substep bound. The kernel
   test's layer-budget reference reuses the plume routines it checks.
 - `test_apply_mmm_patches.sh` stops without a FAIL line if its mtime loop fails.
+
+## P5 plan: PBL intervals, restart and MPI (PBL-only part)
+
+P5 splits in two. The coupled PBL/convection/MICM qualification needs the
+convective transport of #41, whose stages C1–C6 are not implemented yet; it
+stays open as P5b. This plan covers P5a, which the PBL transport can
+qualify alone: nondefault PBL intervals, restart, chemistry intervals and MPI
+decomposition.
+
+### Audit (2026-11-08)
+
+- `config_pbl_interval` does not set a call interval in MPAS. The physics
+  manager creates the `pbl` alarm and sets `dt_pbl` to the interval, but nothing
+  tests the alarm (`mpas_is_alarm_ringing` is called for radiation, convection
+  and the other physics alarms, never for `pbl`). `physics_driver` calls the surface
+  layer, the land surface and the PBL on every physics step, and the PBL schemes
+  (YSU `dt`, MYNN `delt`), Noah (`dt`), the gravity-wave drag, the ocean mixed
+  layer and sea ice all integrate with `dt_pbl`. With an interval longer than
+  `config_dt`, each step therefore advances those schemes by the interval: the
+  land surface runs fast by interval/dt, and the PBL tendencies come from an
+  implicit step of the wrong length. Upstream MPAS (`NSF-NCAR/MPAS`) has the same
+  code. Only `'none'` (`dt_pbl = dt`) is consistent.
+- The PBL tendencies (`rublten`, `rvblten`, `rthblten`, `rqvblten`, …) live in
+  `tend_physics`, are applied at every dynamics step and are in the restart
+  stream, so MPAS already supports holding them between PBL calls (as WRF does
+  with `bldt`).
+- The gas operator cache is module memory, refreshed by every PBL call and not
+  restarted. At the default interval every step refreshes it before use.
+- `config_chemistry_interval` (seconds, 0 = every step) sets the MICM cadence.
+  Gas PBL transport acts on the post-chemistry gases every step.
+- Partition files for 2, 4, 8, 12, 16, 24 and 32 ranks exist in
+  `~/Data/MPAS/supercell/`.
+
+### Decision needed before Task 2
+
+Nondefault PBL intervals are broken in native MPAS, independent of chemistry.
+Gas transport at such intervals cannot be qualified until the native cadence is
+right. The options:
+
+1. **Repair the cadence in CheMPAS-A (recommended).** Run the surface layer,
+   land surface and PBL group only when the `pbl` alarm rings, with `dt_pbl` the
+   interval, and hold their tendencies in between: WRF's `bldt` semantics, which
+   the `dt_pbl` arguments already assume. `'none'` stays bitwise unchanged. This
+   changes results only for runs that set a nondefault interval, which are wrong
+   today. The defect would be reported upstream (outward-facing: your call).
+2. **Keep rejecting nondefault intervals.** Document the native defect, report
+   it upstream, and close P5a's interval work as "not supported". Restart, chemistry
+   intervals and MPI still proceed.
+
+### Tasks
+
+1. **Reproduce the native defect** (no code change): a supercell YSU run with
+   `config_pbl_interval` three times `config_dt`, transport off, logging PBL
+   calls and `DT_PBL`, against `'none'`. Expected: the PBL runs every step with
+   `dt_pbl` = 3·dt. Gives the evidence for the decision and the upstream report.
+2. **Native cadence repair** (option 1 only; its own commit). Gate the
+   surface-layer/LSM/PBL group (and the schemes that take `dt_pbl`: GWDO, OML,
+   sea ice) on the `pbl` alarm, reset it like the convection alarm, and keep the
+   held tendencies. Tests: `'none'` and an interval equal to `config_dt` are
+   bitwise identical to the pre-P5 executable; at 3·dt the group runs every third
+   step (log), tendencies are held between calls, and restart files carry them.
+   A native-meteorology comparison against `'none'` is reported, not required to
+   match.
+3. **Gas transport at a nondefault interval.** The held operator is applied every
+   step with the model `dt` between refreshes, consistent with the held
+   meteorological tendencies. Add a refresh stamp to the cache (the step or time of
+   the last PBL call) and stop the model if the operator is applied before any
+   refresh or after its interval has expired. Lift the interval gate for YSU and
+   MYNN. Tests: unit tests for the stamp and gate; in-model on/off pairs at 3·dt
+   for YSU and MYNN (non-gas fields bitwise, conservation, down-gradient mixing).
+4. **Restart.** Continuous against restarted runs, gas transport on, at `'none'`
+   and at 3·dt, with the restart on an interval boundary: every field bitwise
+   identical (the alarm rings at the restart time, as radiation's does, so the
+   operator is rebuilt before use). A restart off the interval boundary shifts
+   the PBL cadence as it does for radiation; it is reported and documented, not
+   required to match. Add the repeated-`pbl_gas_init` unit test (P3 deferred).
+5. **Chemistry intervals.** Transport on with `config_chemistry_interval` of 1, 3
+   and 7 model steps (YSU and MYNN): conservation, nonnegativity, and the P2
+   realized-increment check that the PBL increment is applied exactly once per
+   step whether chemistry ran that step or not.
+6. **MPI decomposition.** The same 60-s case, transport on, on 1, 2, 4 and 8
+   ranks: gas fields aligned by `indexToCellID` agree within `atol = 1e-18 kg/kg`,
+   `rtol = 1e-10`, with observed differences reported (the spec's thresholds; the
+   meteorology is not expected to be bitwise across decompositions). Include a
+   decomposition with ranks whose columns are all inactive (PBL off in a region is
+   not available, so a rank count high enough to leave a rank with only
+   zero-exchange columns, or a unit test of an all-inactive rank).
+7. **Documentation**: the P5a section, the gate table, and the upstream report
+   text for the native defect (filing it is your call).
+
+Out of scope here: P5b coupling with #41, OpenMP thread-private buffers (the
+builds use `OPENMP=false`; noted for P6 with the Clang/Flang builds), and the
+P3/P4 items deferred to P6.
 
 ## Verification and completion criteria
 
