@@ -90,9 +90,9 @@ Implementation plans for gas-phase physics are tracked on the feature branches:
 and [convective transport](https://github.com/NCAR/CheMPAS-A/blob/chempas-a-convect/docs/plans/convective-transport.md).
 These plans describe pending work and qualification requirements. On
 `chempas-a-pbl`, `config_micm_pbl_transport = true` mixes MICM gases with the
-YSU scheme's scalar exchange coefficient at the default PBL interval
-(`config_pbl_interval = 'none'`); MYNN and nondefault intervals are rejected
-at initialization.
+YSU scheme or with MYNN (its local diffusion and, when enabled, its updraft and
+downdraft mass flux) at the default PBL interval (`config_pbl_interval =
+'none'`); nondefault intervals are rejected at initialization.
 
 ## Sharing plots
 

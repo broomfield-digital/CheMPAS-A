@@ -1024,6 +1024,23 @@ flowchart TD
  end subroutine pbl_edmf_updraft_column
 ```
 
+> **As implemented in P4** (see the plan's P4 section). The sketches in 6.2, 6.4, 6.5 and 6.7 are the
+> design; the code differs in these details:
+> - The gate accepts MYNN in every mode. `pbl_gas_capability` has no MYNN arguments; `pbl_gas_init` reads
+>   `config_mynn_edmf`/`config_mynn_edmf_dd` only to choose the operator (MYNN runs downdrafts only
+>   inside its updraft scheme).
+> - Local diffusion uses MYNN's own `exch_h` (no patch): `G(k) = rhoz_d(k)*exch_h(k)/dzk` on the bottom
+>   face of layer k, with MYNN's face-density interpolation and `rho_d = rho_p/(1+qv)`
+>   (`pbl_gas_exchange_faces`). MYNN's mass-flux floor on `khdz` is not copied.
+> - The plume export is per plume, not bulk `edmf_mu`/`edmf_ent`: two hash-checked patches add
+>   `aw_up`/`ent_up` (`DMP_mf`, 8 plumes, top face of layer k) and `aw_dn`/`ent_dn` (`DDMF_JPL`,
+>   5 downdrafts, bottom face of layer k) and pass them out of `bl_mynn_run`; the MPAS wrapper passes
+>   them as optional `edmf_aw_up`, `edmf_ent_up`, `edmf_aw_dn`, `edmf_ent_dn`.
+> - Each plume is made mass-consistent at store time, `E = max(eps*M_in/(1-eps), M_out-M_in)`, and the
+>   kernel (`mpas_atmphys_pbl_edmf`) rebuilds plume gas each substep and applies plume flux with upwind
+>   compensating motion; the substep count bounds every layer's outflow, so each update is convex.
+>   Updrafts and downdrafts are applied together after the diffusion.
+
 ### 6.8 🟠 What is deliberately not reused from WRF-Chem paths
 
 ```fortran

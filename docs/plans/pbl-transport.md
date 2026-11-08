@@ -1,10 +1,11 @@
 # Implementation plan: PBL transport of MICM tracers
 
 Status: the P1 shared foundation (`0e2f15f6`), P2, the column diffusion kernel
-and tendency proof (`7ae5f39d` shared, `0eb2c8ad`), and P3, YSU gas transport at
-the default PBL interval (see [P3](#p3-ysu-gas-pbl-transport-implemented)), are
-implemented. MYNN, intervals/restart and toolchain qualification (P4–P6) are
-pending.
+and tendency proof (`7ae5f39d` shared, `0eb2c8ad`), P3, YSU gas transport at the
+default PBL interval (see [P3](#p3-ysu-gas-pbl-transport-implemented)), and P4,
+MYNN gas transport with its local diffusion, updrafts and downdrafts (see
+[P4](#p4-mynn-gas-pbl-transport-implemented)), are implemented. Intervals/restart
+and toolchain qualification (P5–P6) are pending.
 
 - Tracking issue: [CheMPAS-A #40](https://github.com/NCAR/CheMPAS-A/issues/40).
 - Branch: `chempas-a-pbl`, from `chempas-a` at
@@ -144,8 +145,11 @@ deterministic application, and retained license notices. An edited ignored
   default-interval integration, and stable/unstable/top-down qualification.
   Commits `85f68008` (MMM-physics export patch) and `c1bd210a`; see
   [P3](#p3-ysu-gas-pbl-transport-implemented).
-- [ ] P4: MYNN local diffusion, then updraft EDMF, then downdraft EDMF in separate
-  commits. Keep unqualified combinations rejected at initialization.
+- [x] P4: MYNN local diffusion, then updraft EDMF, then downdraft EDMF in separate
+  commits. Keep unqualified combinations rejected at initialization. Commits
+  `a68d7598`, `c5e144da`, `9eca3f99`, `0c21a646`, `2181961a`, `872e9255` and
+  `fd9ccbe8`; see
+  [P4](#p4-mynn-gas-pbl-transport-implemented).
 - [ ] P5: nondefault interval contract, cache restart behavior, MPI/halo checks,
   and coupled PBL/convection/chemistry qualification after #41 is available.
 - [ ] P6: GCC/gfortran and Clang/Flang eight-rank results, supported-configuration
@@ -524,7 +528,7 @@ The rest of the chain from YSU to the kernel is unit-tested:
 | No transported MICM gas | logged no-op |
 | `config_pbl_scheme = 'off'` | supported zero transport, logged |
 | `bl_ysu` with `sf_monin_obukhov`/`sf_monin_obukhov_rev`, `config_pbl_interval = 'none'`, `config_ysu_pblmix` either | enabled |
-| `bl_mynn` | stops: not qualified until P4 |
+| `bl_mynn` | stopped until P4; enabled since P4 (see the P4 gate) |
 | a nondefault `config_pbl_interval` | stops: until P5 |
 | another scheme, or a surface layer of `off` | stops (MPAS's `physics_namelist_check` already rejects YSU without a surface layer) |
 
@@ -631,6 +635,196 @@ ranks. They are kept outside the repository, under
   `pbl_gas_init` has no unit test.
 - With `flag_qi = .false.`, the YSU wrapper copies out an undefined ice
   tendency. This is pre-existing and unused by the driver.
+
+## P4 MYNN gas PBL transport (implemented)
+
+P4 connects MYNN to the gas transport in every mass-flux mode. It has seven
+commits on `chempas-a-pbl`, besides this record:
+
+- `a68d7598` (P4a), local diffusion;
+- `c5e144da`, the MMM-physics patch exporting MYNN's updraft plumes;
+- `9eca3f99` (P4b), updraft EDMF;
+- `0c21a646`, a fix to MPAS's MYNN wrapper found while testing (below);
+- `2181961a` (P4c), downdraft EDMF, with the patch extended to downdrafts;
+- `872e9255`, the wrapper allocating the plume export only when asked for it;
+- `fd9ccbe8`, the in-model qualification for every MYNN mode.
+
+### Operator
+
+**Local diffusion.** MYNN mixes every scalar with `khdz(k) = rhoz(k)*dfh(k)`
+on the bottom face of layer k, and exports `exch_h(k) = dfh(k)*dzk` on that face
+(`exch_h(1) = 0`). The gas operator is MYNN's own, in dry form, with no patch:
+`G(k) = rhoz_d(k)*exch_h(k)/dzk`, `dzk = 0.5*(dz(k)+dz(k-1))`, with MYNN's face
+interpolation `rhoz_d(k) = (rho_d(k)*dz(k-1)+rho_d(k-1)*dz(k))/(dz(k-1)+dz(k))`
+and `rho_d = rho_p/(1+qv)` (`pbl_gas_exchange_faces`). The P2 kernel applies it
+with the model `dt`. MYNN raises `khdz` to at least `0.5*s_aw` to stabilize its
+centered compensating subsidence; that floor is not copied, because the gas
+operator's upwind compensation supplies the same order of diffusion and is
+monotone.
+
+**Mass flux.** MYNN does not export its plumes, so two hash-checked patches
+(`bl_mynn_subroutines-export-plumes.patch`, `bl_mynn-export-plumes.patch`, in
+the P3 patch mechanism) add per-plume outputs:
+
+- updrafts (`DMP_mf`, 8 plumes): `aw_up(k,i) = UPA*UPW*Psig_w` on the top face of
+  layer k after the flux limiter (summed with `rhoz`, MYNN's `s_aw(k+1)`), and
+  the mixing fraction `ent_up = ENT*dz` where the plume leaves layer k;
+- downdrafts (`DDMF_JPL`, 5 downdrafts): `aw_dn(k,j) = DOWNA*(-DOWNW)` on the
+  bottom face of layer k, where MYNN's `sd_aw(k)` stores it, and `ent_dn`.
+
+MYNN mixes a scalar into a plume with `eps = ENT*dz` whatever the plume's mass
+flux does. Where a plume accelerates, that drains a layer of gas it never had,
+so the gas operator makes each plume mass-consistent when it stores it:
+
+    E(k) = max(eps*M_in/(1-eps), M_out - M_in),   D(k) = M_in + E(k) - M_out >= 0,
+    c(k) = (M_in*c_in + E(k)*q(k))/(M_in + E(k)).
+
+Where MYNN's fraction already keeps `D >= 0`, the rebuilt plume is exactly
+MYNN's `(1-eps)*c + eps*q`; elsewhere just enough environmental air is
+entrained. An updraft is rooted in layer 1, a downdraft in its start layer, and
+a plume detrains wholly in the layer it ends in. Dry mass fluxes use the dry
+density at the face the flux crosses.
+
+After the diffusion, `mpas_atmphys_pbl_edmf` rebuilds the plume gas from the
+post-chemistry profiles at each substep and applies the plume fluxes with
+compensating environmental motion from the upwind layer: downward from above
+for updrafts, upward from below for downdrafts. In flux form,
+
+    m_d(k)*dq(k)/dt = sum over plumes [D*c(k) - E*q(k)]
+                      - (Mtot(k) + Ntot(k+1))*q(k) + Mtot(k+1)*q(k+1) + Ntot(k)*q(k-1),
+
+so an explicit step of length `dts` is a convex combination of `q(k)`, its
+neighbours and the plume concentrations when `dts*(Eu(k) + Mtot(k) + Ed(k) +
+Ntot(k+1)) <= m_d(k)`. The step uses the fewest equal substeps that meet this in
+every layer: monotone, nonnegative, conservative to roundoff, a uniform gas
+unchanged and a zero gas zero. A bound above 1e4 substeps, a non-finite
+operator, or invalid plume data stops the model.
+
+Only operators are held, refreshed every step at the default interval, as in P3.
+
+### Column tests
+
+- `unit/test_mynn_gas_operator.F90` runs MYNN through the MPAS wrapper on
+  synthetic columns (`unit/mynn_column.F90`):
+  - local diffusion reproduces MYNN's own mixing of a passive scalar
+    (water-friendly aerosol) to 2.5e-16 in stable and convective dry columns.
+    The pinned MYNN mixes ozone but reports a zero ozone tendency, so ozone
+    cannot serve;
+  - with updrafts, a moist convective column conserves, bounds and leaves
+    uniform every gas; the plumes lift a surface-rich aerosol 0.91 times as much
+    as MYNN's own aerosol mixing does beyond local diffusion (the
+    discretizations differ, centered implicit against upwind explicit);
+  - with updrafts and downdrafts, a stratocumulus-topped column conserves and
+    bounds every gas, and the downdrafts carry cloud-top gas downward.
+- `unit/test_mynn_wrapper_export.F90` checks that the exported updraft flux,
+  summed over plumes, is MYNN's `edmf_a*edmf_w` to 2.4e-16; that the export is
+  confined to the faces it should occupy; that level `kme` is not written; and
+  that every other output is bitwise unchanged when the export is absent or an
+  unallocated array. It also checks that repeated MYNN calls on a cloudy column
+  without snow microphysics are bitwise identical (see below).
+- `unit/test_pbl_edmf.F90` checks the kernels on synthetic plumes: mass flux on
+  faces, mass-consistent entrainment, MYNN's mixing wherever its fraction is
+  consistent (97 updraft and 31 downdraft layers), an independent layer-budget
+  form (agreement to 4e-16), conservation per call and over 1,000 calls, bounds,
+  zero and uniform gases, bitwise substep equivalence, and rejection of invalid
+  input.
+- `unit/test_pbl_gas.F90` and `unit/test_pbl_gas_exchange.F90` cover the gate,
+  the face exchange, the plume caches and their mask, and `apply` (bitwise the
+  diffusion followed by the plume step).
+
+### Gate
+
+| Configuration with `config_micm_pbl_transport = .true.` | Result |
+| --- | --- |
+| `bl_mynn` (MPAS selects `sf_mynn`), `config_pbl_interval = 'none'` | enabled; logs the operator: local diffusion, plus updraft EDMF with `config_mynn_edmf = 1`, plus downdraft EDMF with `config_mynn_edmf_dd = 1` as well |
+| `bl_mynn` with a nondefault `config_pbl_interval` | stops: until P5 |
+
+MYNN runs its downdrafts only inside its updraft scheme, so
+`config_mynn_edmf_dd` has no effect with `config_mynn_edmf = 0`.
+
+### MYNN defects found
+
+- MPAS's `bl_mynn_pre_run` zeroed the specific cloud water and ice but not the
+  snow content, which it sets only when the microphysics carries snow. With
+  Kessler, MYNN's cloud PDF read an uninitialized stack array, so its results in
+  cloudy columns depended on earlier calls (8.6 m² s⁻¹ in `exch_h` at a cloud
+  top between two identical calls). `0c21a646` zeroes it; runs with snow are
+  unchanged. Transport-off MYNN runs are therefore compared with the pre-P4
+  executable plus that fix.
+- Not fixed, pinned MMM-physics:
+  - `DDMF_JPL` limits the downdraft velocity with `MIN(1.25*dz/200, -2)` where
+    a -2 m/s bound is meant, so every downdraft slows by `1.25*dz/200` m/s per
+    level and survives MYNN's two-level minimum only when it starts faster
+    than that. Realistic stratocumulus downdrafts barely transport; the column
+    test uses strong cloud-top cooling.
+  - `DDMF_JPL`'s diagnostic averaging reads `DOWNA(k-1)` and `ENT(k-1)` below
+    their bounds. The unit tests compile that file without bounds checking.
+  - `bl_mynn_pre_run` converts snow with `qs/(1+qs)` instead of `qs/(1+qv)`.
+    Fixing it would change runs with snow microphysics.
+
+### In-model qualification
+
+`check_pbl_mynn.sh BASELINE_DIR RUN_ROOT [MODEL [PRE_P4_MODEL]]` runs the
+supercell with MYNN (MPAS selects `sf_mynn`) and the P3 setup: inert mechanism,
+lightning off, `make_pbl_init.py` gas profiles, 300 s on eight ranks with output
+every 60 s, each case with and without gas transport, checked by
+`check_pbl_ysu.py` (non-gas fields bitwise, `hpbl > 0`, nonnegativity, mass
+drift ≤ 1e-13, down-gradient mixing). Results (GNU, eight ranks, final record):
+
+| Case | hpbl min / median (m) | hfx median (W m⁻²) | Column variance mixed out: NO / NO2 / O3 | Max gas mass drift |
+| --- | --- | --- | --- | --- |
+| Local, stable (`config_mynn_edmf = 0`) | 299 / 299 | −32 | 7.1e-4 / 1.5e-6 / 1.3e-5 | 4.1e-16 |
+| Local, convective (305 K) | 299 / 401 | +73 | 9.4e-3 / 5.1e-6 / 1.3e-4 | 4.1e-16 |
+| Updraft EDMF (MPAS default), convective | 299 / 401 | +73 | 9.4e-3 / 5.1e-6 / 1.3e-4 | 4.1e-16 |
+| Updraft and downdraft EDMF, convective | 299 / 401 | +73 | 9.4e-3 / 5.1e-6 / 1.3e-4 | 4.1e-16 |
+
+Every check passes; every on/off pair has bitwise identical non-gas fields, and
+convective mixing exceeds stable mixing (NO by 13 times, O3 by 10). Transport
+off with downdrafts on, and local diffusion off, are bitwise identical in every
+output field to the executable before P4 with the snow fix
+(`pre-p4-fixed-atmosphere_model`, `b6373312`: `8a727d94` plus `0c21a646`).
+
+MYNN's mass flux does not activate on this grid, so the EDMF rows repeat the
+local ones. MYNN switches its plumes off unless the first plume rises a full
+model level, and its PBL top sits at the first interface (299 m) under the
+413 m second layer. Scale awareness (the mesh spacing is 540 m) would suppress
+the plumes as well, but without it a run at 315 K still stays plume-free for
+15 simulated minutes, its PBL below 432 m, and a model column replayed through the unit
+harness confirms the plume deactivation. No stratocumulus top triggered the
+downdraft scheme either. The EDMF pairs are therefore integration evidence: the
+mass-flux code paths run with gas transport on, conserve, and leave the
+meteorology bitwise unchanged. The mass-flux operator itself is qualified by the
+column tests on MYNN's own plumes. A finer-grid fixture belongs before P6, as
+for P3.
+
+The P3 qualifications rerun on the final P4 executable pass unchanged:
+`check_pbl_ysu.sh` (45 checks; the YSU mixing fractions equal P3's to the digits
+shown in its table, and transport off is bitwise identical to the pre-P3
+executable), the PBL-off 60-s and 600-s smoke runs against the P1 references,
+and the P1 wiring check. The final runs were at `872e9255` (scripts at
+`fd9ccbe8`; the MYNN run's provenance records `9e2e5f88`, the same script
+before a comment correction), with GNU on eight ranks, kept outside the repository under
+`~/Data/CheMPAS-A/p4-dev/`: `pbl-mynn-final`, `pbl-ysu-final`,
+`smoke-60s-final`, `smoke-600s-final` and `wiring-final`, with the executables
+`p4-872e9255-atmosphere_model` and `pre-p4-fixed-atmosphere_model`.
+
+### Deferred (P4)
+
+- Report upstream (outward-facing; for the maintainers): the export patches;
+  `DDMF_JPL`'s velocity limiter and out-of-bounds diagnostic reads; the snow
+  conversion in `bl_mynn_pre_run`.
+- MYNN's downdraft mixing fraction is not capped (the `0.9/dz` cap is commented
+  out upstream), so `eps >= 1` would stop the model as invalid plume data. The
+  limiter defect makes such downdrafts unreachable today.
+- The plume caches hold `(2*nlev+1)*13` values per column, 26 times the diffusion
+  cache, and each substep rebuilds all plumes over the full column. Storing only
+  up to the highest plume top would cut both (with P6 performance work).
+- The unit wrapper test does not drive MYNN's flux limiter; a review probe
+  confirmed the export equals `edmf_a*edmf_w` when it fires.
+- `pbl_edmf_column` relies on `M(1,:) = 0` and `N(nz+1,:) = 0` from its
+  producers, and its error message names only the substep bound. The kernel
+  test's layer-budget reference reuses the plume routines it checks.
+- `test_apply_mmm_patches.sh` stops without a FAIL line if its mtime loop fails.
 
 ## Verification and completion criteria
 
