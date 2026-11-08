@@ -308,10 +308,10 @@
  real(kind=kind_phys),dimension(its:ite,kts:kte):: &
     exchh_hv,exchm_hv,dqke_hv,qwt_hv,qshear_hv,qbuoy_hv,qdiss_hv
 
- real(kind=kind_phys),dimension(its:ite,kts:kte,mynn_edmf_nup):: &
-    awup_hv,entup_hv
- real(kind=kind_phys),dimension(its:ite,kts:kte,mynn_edmf_ndown):: &
-    awdn_hv,entdn_hv
+!plume export work arrays, allocated only when the caller asks for the export (an unallocated array is an
+!absent argument of bl_mynn_run), so MYNN without gas transport carries no extra memory:
+ real(kind=kind_phys),dimension(:,:,:),allocatable:: &
+    awup_hv,entup_hv,awdn_hv,entdn_hv
 
  real(kind=kind_phys),dimension(its:ite,kts:kte):: &
     sqv_hv,sqc_hv,sqi_hv,sqs_hv
@@ -352,6 +352,11 @@
  if(bl_mynn_topdown    == 1) mynn_topdown_l    = .true.
 
  dheat_opt = bl_mynn_dheat_opt
+
+ if(present(edmf_aw_up) .and. present(edmf_ent_up)) &
+    allocate(awup_hv(its:ite,kts:kte,mynn_edmf_nup),entup_hv(its:ite,kts:kte,mynn_edmf_nup))
+ if(present(edmf_aw_dn) .and. present(edmf_ent_dn)) &
+    allocate(awdn_hv(its:ite,kts:kte,mynn_edmf_ndown),entdn_hv(its:ite,kts:kte,mynn_edmf_ndown))
 
  do j = jts,jte
 
