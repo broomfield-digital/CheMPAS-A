@@ -1,0 +1,69 @@
+--- a/physics_mmm/bl_mynn_subroutines.F90
++++ b/physics_mmm/bl_mynn_subroutines.F90
+@@ -350,7 +350,11 @@ MODULE bl_mynn_subroutines
+            phih,                     &
+            phim,                     &
+            retrieve_exchange_coeffs, &
+-           scale_aware
++           scale_aware,              &
++           mynn_edmf_nup
++
++!CheMPAS-A: number of MYNN updraft plumes (DMP_mf), for the plume export used by passive-gas transport.
++  integer, parameter :: mynn_edmf_nup = 8
+ 
+ !===================================================================
+ ! From here on, these are MYNN-specific parameters:
+@@ -4674,7 +4678,9 @@ ENDIF
+             ! output info
+                  & maxwidth,ktop,maxmf,ztop,    &
+             ! inputs for stochastic perturbations
+-                 & spp_pbl,rstoch_col           )
++                 & spp_pbl,rstoch_col,          &
++            ! CheMPAS-A: optional per-plume export for passive-gas transport
++                 & aw_up,ent_up                 )
+ 
+   ! inputs:
+      integer, intent(in) :: ii
+@@ -4715,9 +4721,15 @@ ENDIF
+      real(kind_phys),dimension(kts:kte), intent(inout) ::              &
+           &qc_bl1d,cldfra_bl1d,qc_bl1d_old,cldfra_bl1d_old
+ 
+-    integer, parameter :: nup=8, debug_mf=0
++    integer, parameter :: nup=mynn_edmf_nup, debug_mf=0
+     real(kind_phys)    :: nup2
+ 
++  ! CheMPAS-A outputs, per plume: area-weighted vertical velocity UPA*UPW*Psig_w [m s-1] on the top face of
++  ! layer k (after the flux limiter; zero where the scheme does not transport, so that rhoz*aw_up summed
++  ! over plumes is s_aw(k+1)), and the entrainment fraction ENT*dz used to mix the plume through layer k
++  ! (zero unless the plume leaves layer k through its top face).
++     real(kind_phys),dimension(kts:kte,1:nup), intent(out), optional :: aw_up,ent_up
++
+   !------------- local variables -------------------
+   ! updraft properties defined on interfaces (k=1 is the top of the
+   ! first model layer
+@@ -4833,6 +4845,8 @@ ENDIF
+ !     print *,'pblh',pblh
+ 
+ ! Initialize individual updraft properties
++  if (present(aw_up))  aw_up  = 0.
++  if (present(ent_up)) ent_up = 0.
+   UPW=0.
+   UPTHL=0.
+   UPTHV=0.
+@@ -5459,6 +5473,16 @@ IF (nup2 > 0) THEN
+    ENDIF
+    !Print*,"adjustment=",adjustment," fluxportion=",fluxportion," flt=",flt
+ 
++   !CheMPAS-A: per-plume export (the plume terms of s_aw and the mixing fractions)
++   if (present(aw_up) .and. present(ent_up)) then
++      do i=1,nup
++         do k=kts,kte-1
++            aw_up(k,i) = UPA(K,i)*UPW(K,i)*Psig_w
++            if (k > kts .and. aw_up(k,i) > 0.) ent_up(k,i) = ENT(k,i)*(ZW(k+1)-ZW(k))
++         enddo
++      enddo
++   endif
++
+    !Calculate mean updraft properties for output:
+    !all edmf_* variables at k=1 correspond to the interface at top of first model layer
+    do k=kts,kte-1

@@ -2,3 +2,5 @@
 # Applied in order by ../../apply_mmm_patches.sh, relative to src/core_atmosphere/physics.
 # patch-file  target-file  sha256-of-pinned-target  sha256-after-patch
 bl_ysu-export-xkzq.patch  physics_mmm/bl_ysu.F90  b2c9f11f92f967b053948b42a7c5dbaf1b7f72ddb9d35948e96c32a5d91092d2  193d33845838fa535a2aa148fa6120a48862d763b3ace78b08db328a5aeb7dbc
+bl_mynn_subroutines-export-plumes.patch  physics_mmm/bl_mynn_subroutines.F90  052e69a457df365459f5f4f30610153a1686cd239b7cb0fa841ebfd2b04fba9c  c55966027dbe8f4139e8041a17bdae79aeb6ad9923a0462dbb2f42707fe5c2f9
+bl_mynn-export-plumes.patch  physics_mmm/bl_mynn.F90  c46825fe4fcb4c5b05f8be9e48b2115d70f341886e1105cb3121603ea748bdde  9813f20c575a04adf5c551a0f95cb0033bd173dc069cc7175d72b354addfd9d8

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Self-test for src/core_atmosphere/physics/apply_mmm_patches.sh: a pristine
-# MMM-physics file is patched to the recorded result, a patched file is left
+# Self-test for src/core_atmosphere/physics/apply_mmm_patches.sh, over every
+# MANIFEST entry (YSU, P3; MYNN, P4): a pristine MMM-physics file is patched
+# to the recorded result, a patched file is left
 # alone, and a file with other edits is refused. --revert (run by the physics
 # Makefile before checkout_externals, which skips every external while one has
 # local changes) restores the pinned file and a clean external; applying again
@@ -24,40 +25,50 @@ mkdir -p "$work/physics/physics_mmm"
 cp "$physics/apply_mmm_patches.sh" "$work/physics/"
 cp -r "$physics/patches" "$work/physics/"
 mmm=$work/physics/physics_mmm
-git -C "$physics/physics_mmm" show HEAD:bl_ysu.F90 > "$mmm/bl_ysu.F90"
-git -C "$mmm" init -q
-git -C "$mmm" add bl_ysu.F90
-git -C "$mmm" -c user.name=test -c user.email=test@example.invalid commit -q -m pinned
 manifest=$work/physics/patches/mmm-physics/MANIFEST
-pristine=$(awk '$1 !~ /^#/ && $2 == "physics_mmm/bl_ysu.F90" {print $3}' "$manifest")
-patched=$(awk '$1 !~ /^#/ && $2 == "physics_mmm/bl_ysu.F90" {print $4}' "$manifest")
+# every target file in MANIFEST, from the pinned external
+mapfile -t targets < <(awk '$1 !~ /^#/ && NF == 4 {sub("^physics_mmm/", "", $2); print $2}' "$manifest")
+for t in "${targets[@]}"; do
+    git -C "$physics/physics_mmm" show "HEAD:$t" > "$mmm/$t"
+done
+git -C "$mmm" init -q
+git -C "$mmm" add "${targets[@]}"
+git -C "$mmm" -c user.name=test -c user.email=test@example.invalid commit -q -m pinned
 script=$work/physics/apply_mmm_patches.sh
-hash() { sha256sum "$mmm/bl_ysu.F90" | cut -d" " -f1; }
+hash() { sha256sum "$mmm/$1" | cut -d" " -f1; }
+recorded() { awk -v t="physics_mmm/$1" -v c="$2" '$1 !~ /^#/ && $2 == t {print $c}' "$manifest"; }
+all_hashes() {
+    # all_hashes COLUMN: every target has the MANIFEST hash in COLUMN (3 pinned, 4 patched)
+    local t
+    for t in "${targets[@]}"; do [[ $(hash "$t") == $(recorded "$t" "$1") ]] || return 1; done
+}
+check '(( ${#targets[@]} == 3 ))' "MANIFEST lists the YSU and the two MYNN targets"
 
-check '"$work/physics/apply_mmm_patches.sh" > "$work/out1" 2>&1' "pristine file is patched"
-check '[[ $(sha256sum "$work/physics/physics_mmm/bl_ysu.F90" | cut -d" " -f1) == "$patched" ]]' \
-      "patched file has the recorded hash"
-check 'grep -q xkzqx "$work/physics/physics_mmm/bl_ysu.F90"' "export argument is present"
-check '"$work/physics/apply_mmm_patches.sh" > "$work/out2" 2>&1 && grep -q "already patched" "$work/out2"' \
+check '"$script" > "$work/out1" 2>&1' "pristine files are patched"
+check 'all_hashes 4' "patched files have the recorded hashes"
+check 'grep -q xkzqx "$mmm/bl_ysu.F90"' "YSU export argument is present"
+check 'grep -q "aw_up,ent_up" "$mmm/bl_mynn_subroutines.F90" && grep -q edmf_aw_up "$mmm/bl_mynn.F90"' \
+      "MYNN plume export arguments are present"
+check '"$script" > "$work/out2" 2>&1 && (( $(grep -c "already patched" "$work/out2") == 3 ))' \
       "second application is a no-op"
 
-touch -d "2001-02-03 04:05:06" "$mmm/bl_ysu.F90"
+for t in "${targets[@]}"; do touch -d "2001-02-03 04:05:06" "$mmm/$t"; done
 before=$(stat -c %Y "$mmm/bl_ysu.F90")
 check '"$script" --revert > "$work/out4" 2>&1' "revert succeeds"
-check '[[ $(hash) == "$pristine" ]]' "revert restores the pinned file"
+check 'all_hashes 3' "revert restores the pinned files"
 check '[[ -z $(git -C "$mmm" status --porcelain) ]]' "revert leaves the external clean for checkout_externals"
-check '"$script" --revert > "$work/out5" 2>&1 && grep -q "not patched" "$work/out5" && [[ $(hash) == "$pristine" ]]' \
-      "reverting the pinned file is a no-op"
-check '"$script" > "$work/out6" 2>&1 && [[ $(hash) == "$patched" ]]' "applying after a revert patches again"
-check '[[ $(stat -c %Y "$mmm/bl_ysu.F90") == "$before" ]]' \
-      "re-applied file keeps its earlier modification time"
-check '[[ -z $(git -C "$mmm" status --porcelain --ignored | grep -v bl_ysu.F90) ]]' \
+check '"$script" --revert > "$work/out5" 2>&1 && (( $(grep -c "not patched" "$work/out5") == 3 )) && all_hashes 3' \
+      "reverting the pinned files is a no-op"
+check '"$script" > "$work/out6" 2>&1 && all_hashes 4' "applying after a revert patches again"
+check 'for t in "${targets[@]}"; do [[ $(stat -c %Y "$mmm/$t") == "$before" ]] || exit 1; done' \
+      "re-applied files keep their earlier modification times"
+check '[[ -z $(git -C "$mmm" status --porcelain --ignored | grep -v "\.F90$") ]]' \
       "no state files are left in the external"
 
-echo "! unrelated local edit" >> "$work/physics/physics_mmm/bl_ysu.F90"
+echo "! unrelated local edit" >> "$mmm/bl_mynn.F90"
 check '! "$script" --revert > "$work/out7" 2>&1 && grep -q "unexpected contents" "$work/out7"' \
       "revert refuses a file with other edits"
-check '! "$work/physics/apply_mmm_patches.sh" > "$work/out3" 2>&1 && grep -q "unexpected contents" "$work/out3"' \
+check '! "$script" > "$work/out3" 2>&1 && grep -q "unexpected contents" "$work/out3"' \
       "a file with other edits is refused"
 
 if (( failed )); then echo "test_apply_mmm_patches: FAIL"; exit 1; fi

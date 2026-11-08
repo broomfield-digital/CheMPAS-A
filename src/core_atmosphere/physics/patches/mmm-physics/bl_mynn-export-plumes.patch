@@ -1,0 +1,73 @@
+--- a/physics_mmm/bl_mynn.F90
++++ b/physics_mmm/bl_mynn.F90
+@@ -14,7 +14,8 @@
+  private
+  public:: bl_mynn_init,     &
+           bl_mynn_finalize, &
+-          bl_mynn_run
++          bl_mynn_run,      &
++          mynn_edmf_nup
+ 
+ 
+  contains
+@@ -171,6 +172,7 @@
+              frp               , vdep               ,                      &
+ #endif
+              its, ite , kts , kte , kme , errmsg , errflg                  &
++            ,edmf_aw_up        , edmf_ent_up                                &
+             )    
+ 
+ !=================================================================================================================
+@@ -321,6 +323,12 @@
+     exch_h,      &!
+     exch_m        !
+ 
++!CheMPAS-A: per-plume updraft export for passive-gas transport (dmp_mf aw_up, ent_up), (its:ite,kts:kte,
++!mynn_edmf_nup); zero where the updraft scheme is off or does not transport.
++ real(kind=kind_phys),intent(out),dimension(its:,kts:,:),optional:: &
++    edmf_aw_up,  &!
++    edmf_ent_up   !
++
+  real(kind=kind_phys),intent(out),dimension(its:,:),optional:: &
+     dqke,        &!
+     qwt,         &!
+@@ -391,6 +399,7 @@
+ 
+ !local 1D output arguments:
+  real(kind=kind_phys):: maxwidth1,maxmf1,ztop_plume1
++ real(kind=kind_phys),dimension(kts:kte,mynn_edmf_nup):: aw_up1,ent_up1
+  real(kind=kind_phys),dimension(kts:kte):: exch_h1,exch_m1
+ 
+  real(kind=kind_phys),dimension(kts:kte):: dqke1,qwt1,qshear1,qbuoy1,qdiss1
+@@ -875,6 +884,8 @@
+ 
+ 
+     !--- calls subroutine dmp_mf():
++    aw_up1  = 0._kind_phys
++    ent_up1 = 0._kind_phys
+     if(bl_mynn_edmf) then
+        call dmp_mf( i,                             &
+                 kts,kte,delt,zw,dz1,p1,rho1,       &
+@@ -914,7 +925,8 @@
+                 psig_shcu,                         &
+                 maxwidth1,ktop_plume1,             &
+                 maxmf1,ztop_plume1,                &
+-                spp_pbl,rstoch_col)
++                spp_pbl,rstoch_col,                &
++                aw_up=aw_up1,ent_up=ent_up1)
+ 
+        if(bl_mynn_edmf_dd) then
+           call ddmf_jpl(kts,kte,delt,zw,dz1,p1,         &
+@@ -1234,6 +1246,12 @@
+        exch_h(i,k) = exch_h1(k)
+        exch_m(i,k) = exch_m1(k)
+     enddo
++    if(present(edmf_aw_up) .and. present(edmf_ent_up)) then
++       do k = kts,kte
++          edmf_aw_up(i,k,:)  = aw_up1(k,:)
++          edmf_ent_up(i,k,:) = ent_up1(k,:)
++       enddo
++    endif
+ 
+  enddo
+ 
