@@ -7,13 +7,17 @@
 # Usage: check_pbl_mynn.sh BASELINE_DIR RUN_ROOT [MODEL [PRE_P4_MODEL]]
 #
 # Cases:
-#   gate-edmf                  transport requested with MYNN's updraft EDMF
-#                              (config_mynn_edmf = 1, the MPAS default) stops
-#                              the model with the gate's message
+#   gate-dd                    transport requested with MYNN's downdrafts
+#                              (config_mynn_edmf = config_mynn_edmf_dd = 1)
+#                              stops the model with the gate's message
 #   gate-interval              MYNN with a nondefault PBL interval stops
 #   local-stable-on / -off     config_mynn_edmf = 0, baseline surface (288 K):
 #                              with and without gas transport, 300 s
 #   local-convective-on / -off config_mynn_edmf = 0, skintemp = sst = 305 K
+#   edmf-convective-on / -off  config_mynn_edmf = 1 (updraft plumes, the MPAS
+#                              default), 305 K; edmf_a is written and must show
+#                              plumes in some column
+#   edmf-convective-off-pre-p4 edmf-convective-off with PRE_P4_MODEL: bitwise
 #   local-stable-off-pre-p4    local-stable-off with PRE_P4_MODEL (the
 #                              executable before P4): all output bitwise
 #                              identical
@@ -52,8 +56,8 @@ source "$here/pbl_cases.sh"
 prepare_inputs
 
 echo "== gate cases"
-stage gate-edmf "$run_root/stable_init.nc" "$model" 00:00:06 transport=.true.
-expect_stop gate-edmf "MYNN updraft EDMF gas transport is not yet qualified"
+stage gate-dd "$run_root/stable_init.nc" "$model" 00:00:06 transport=.true. mynn_edmf=1 mynn_edmf_dd=1
+expect_stop gate-dd "MYNN downdraft EDMF gas transport is not yet qualified"
 stage gate-interval "$run_root/stable_init.nc" "$model" 00:00:06 transport=.true. mynn_edmf=0 pbl_interval=00:00:06
 expect_stop gate-interval "config_pbl_interval must be 'none'"
 
@@ -62,19 +66,25 @@ stage local-stable-off "$run_root/stable_init.nc" "$model" 00:05:00 mynn_edmf=0
 stage local-stable-on "$run_root/stable_init.nc" "$model" 00:05:00 mynn_edmf=0 transport=.true.
 stage local-convective-off "$run_root/convective_init.nc" "$model" 00:05:00 mynn_edmf=0 transport=.false.
 stage local-convective-on "$run_root/convective_init.nc" "$model" 00:05:00 mynn_edmf=0 transport=.true.
-cases=(local-stable-off local-stable-on local-convective-off local-convective-on)
+edmf=(mynn_edmf=1 mynn_edmf_dd=0 mynn_edmf_output=1 extra_output=edmf_a)
+stage edmf-convective-off "$run_root/convective_init.nc" "$model" 00:05:00 "${edmf[@]}" transport=.false.
+stage edmf-convective-on "$run_root/convective_init.nc" "$model" 00:05:00 "${edmf[@]}" transport=.true.
+cases=(local-stable-off local-stable-on local-convective-off local-convective-on edmf-convective-off edmf-convective-on)
 if [[ -n "$pre_p4_model" ]]; then
     stage local-stable-off-pre-p4 "$run_root/stable_init.nc" "$pre_p4_model" 00:05:00 mynn_edmf=0
-    cases+=(local-stable-off-pre-p4)
+    stage edmf-convective-off-pre-p4 "$run_root/convective_init.nc" "$pre_p4_model" 00:05:00 "${edmf[@]}"
+    cases+=(local-stable-off-pre-p4 edmf-convective-off-pre-p4)
 fi
 ran=1
 for c in "${cases[@]}"; do
     run_model "$c" || { fail "$c: the model exited with an error; see $run_root/$c"; ran=0; }
 done
-for c in local-stable-on local-convective-on; do
+for c in local-stable-on local-convective-on edmf-convective-on; do
     has_log "$c" "PBL gas transport enabled = T" || fail "$c: PBL gas transport not logged as enabled"
     has_log "$c" "MYNN gas operator = local diffusion" || fail "$c: MYNN gas operator not logged"
 done
+has_log edmf-convective-on "+ updraft EDMF" || fail "edmf-convective-on: updraft EDMF not logged"
+has_log local-convective-on "+ updraft EDMF" && fail "local-convective-on: updraft EDMF logged with edmf = 0"
 has_log local-stable-off "PBL gas transport enabled = F" || fail "local-stable-off: transport logged as enabled"
 
 if (( ran )); then
@@ -86,10 +96,32 @@ if (( ran )); then
         --json "$run_root/local-convective.json" || status=1
     python "$here/check_pbl_ysu.py" stronger "$run_root/local-convective.json" "$run_root/local-stable.json" \
         --gases qNO qO3 || status=1
+    echo "== updraft EDMF, convective surface layer"
+    python - "$run_root/edmf-convective-on" <<'PY' || status=1
+import glob
+import sys
+import numpy as np
+from netCDF4 import Dataset
+peak, columns = 0.0, set()
+for path in sorted(glob.glob(f"{sys.argv[1]}/output*.nc")):
+    with Dataset(path) as ds:
+        a = np.asarray(ds["edmf_a"][:])
+        peak = max(peak, float(a.max()))
+        columns |= set(np.nonzero((a > 0).any(axis=(0, 2)))[0].tolist())
+print(f"plume area: peak {peak:.3g}, columns with plumes in some record: {len(columns)}")
+if peak <= 0.0:
+    print("FAIL edmf-convective-on: MYNN's updraft plumes never active")
+    sys.exit(1)
+print("PASS edmf-convective-on: MYNN's updraft plumes are active")
+PY
+    python "$here/check_pbl_ysu.py" mixing "$run_root/edmf-convective-on" "$run_root/edmf-convective-off" \
+        --json "$run_root/edmf-convective.json" || status=1
     echo "== transport off is unchanged from the pre-P4 executable"
     if [[ -n "$pre_p4_model" ]]; then
         python "$here/check_pbl_ysu.py" compare "$run_root/local-stable-off" "$run_root/local-stable-off-pre-p4" \
             || status=1
+        python "$here/check_pbl_ysu.py" compare "$run_root/edmf-convective-off" \
+            "$run_root/edmf-convective-off-pre-p4" || status=1
     else
         echo "SKIP no PRE_P4_MODEL given"
     fi

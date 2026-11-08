@@ -10,11 +10,20 @@
 !      mixing is local diffusion only.)
 !   B. The operator conserves dry mass of every gas to roundoff, keeps a zero gas zero, leaves a
 !      uniform gas unchanged and mixes a surface-confined gas upward.
+! P4b, updraft EDMF (config_mynn_edmf = 1), moist convective column:
+!   C. Local diffusion followed by the plumes rebuilt from MYNN's export conserves every gas, keeps every
+!      gas within its initial range, a zero gas zero and a uniform gas unchanged.
+!   D. The plumes lift a surface-rich gas beyond what local diffusion does, as MYNN's own mixing of
+!      water-friendly aerosol (local diffusion and updraft mass flux) does; the ratio of the two lifts is
+!      reported (the discretizations differ: MYNN uses centered implicit subsidence with a raised
+!      diffusivity, the gas operator upwind explicit substeps).
 program test_mynn_gas_operator
 
    use mpas_kind_types, only: RKIND
    use unit_assert, only: check, finish
-   use mynn_column, only: column_state, column_output, make_column, run_mynn, nz
+   use mynn_column, only: column_state, column_output, make_column, run_mynn, nz, kme
+   use bl_mynn, only: mynn_edmf_nup
+   use mpas_atmphys_pbl_edmf, only: pbl_edmf_updraft_fluxes, pbl_edmf_column
    use mpas_atmphys_pbl_gas, only: pbl_gas_exchange_faces
    use mpas_atmphys_pbl_diffusion, only: pbl_diffuse_column
    use mpas_atmphys_tracer_column, only: relative_mass_residual
@@ -27,6 +36,7 @@ program test_mynn_gas_operator
    call local_case('stable', gsum_stable)
    call local_case('convective', gsum_convective)
    call check(gsum_convective > gsum_stable, 'convective MYNN exchange exceeds the stable exchange')
+   call edmf_case()
 
    call finish('test_mynn_gas_operator')
 
@@ -85,5 +95,65 @@ contains
       call check(all(abs(u(1,:) - 3.0e-9_RKIND) <= 1.0e-20_RKIND + 1.0e-12_RKIND*3.0e-9_RKIND), &
                  regime//': a uniform gas is unchanged')
    end subroutine local_case
+
+   subroutine edmf_case()
+      type(column_state) :: col
+      type(column_output) :: out
+      real(RKIND), dimension(:,:,:,:), allocatable :: aw, ent
+      real(RKIND) :: aerosol(nz), rnwfa(nz), rho_d(nz), m_d(nz), G(nz+1), Mu(nz+1,mynn_edmf_nup)
+      real(RKIND) :: Eu(nz,mynn_edmf_nup), q0(5,nz), q(5,nz), ql(5,nz), resid, tol, lift_ours, lift_mynn
+      real(RKIND) :: x_mynn(nz), xl(1,nz)
+      logical :: ok, bounded
+      integer :: n, nsub
+
+      call make_column('convective', .true., col)
+      aerosol = 1.0e9_RKIND*(1.0_RKIND + max(0.0_RKIND, 1.0_RKIND - col%zc/3000.0_RKIND))
+      allocate(aw(1,kme,1,mynn_edmf_nup), ent(1,kme,1,mynn_edmf_nup))
+      call run_mynn(col, 1, 0, 0, delt, out, nwfa=aerosol, rnwfa=rnwfa, aw_up=aw, ent_up=ent)
+      call check(out%errflg == 0 .and. any(aw(1,1:nz,1,:) > 0.0_RKIND), 'EDMF: MYNN succeeds and its plumes transport')
+      rho_d = col%rho/(1.0_RKIND + col%qv)
+      m_d = rho_d*col%dz
+      call pbl_gas_exchange_faces(out%exch_h, rho_d, col%dz, G, ok)
+      call pbl_edmf_updraft_fluxes(aw(1,1:nz,1,:), ent(1,1:nz,1,:), rho_d, col%dz, Mu, Eu, ok)
+      call check(ok, 'EDMF: the exported plumes build a valid operator')
+
+      ! C. gases with structure, a uniform and a zero gas
+      q0(1,:) = 2.0e-9_RKIND*exp(-col%zc/300.0_RKIND) + 1.0e-12_RKIND
+      q0(2,:) = merge(1.0e-9_RKIND, 1.0e-11_RKIND, col%zc < 1000.0_RKIND)
+      q0(3,:) = 5.0e-8_RKIND*(0.5_RKIND + 0.5_RKIND*min(col%zc/3000.0_RKIND, 1.0_RKIND))
+      q0(4,:) = 3.0e-9_RKIND
+      q0(5,:) = 0.0_RKIND
+      ql = q0
+      call pbl_diffuse_column(delt, m_d, G, ql)
+      q = ql
+      call pbl_edmf_column(delt, m_d, Mu, Eu, q, nsub, ok)
+      write(*,'(a,i0)') 'EDMF: substeps at the 30 s step = ', nsub
+      call check(ok, 'EDMF: the column step is accepted')
+      resid = 0.0_RKIND
+      bounded = .true.
+      do n = 1, 3
+         resid = max(resid, relative_mass_residual(m_d, q0(n,:), q(n,:)))
+         tol = 1.0e-20_RKIND + 1.0e-12_RKIND*maxval(q0(n,:))
+         bounded = bounded .and. all(q(n,:) >= minval(q0(n,:)) - tol) .and. all(q(n,:) <= maxval(q0(n,:)) + tol)
+      end do
+      call check(resid <= 1.0e-12_RKIND, 'EDMF: dry mass of every gas is conserved')
+      call check(bounded, 'EDMF: every gas stays within its initial range')
+      call check(all(abs(q(4,:) - 3.0e-9_RKIND) <= 1.0e-20_RKIND + 1.0e-12_RKIND*3.0e-9_RKIND), &
+                 'EDMF: a uniform gas is unchanged')
+      call check(all(q(5,:) == 0.0_RKIND), 'EDMF: a zero gas stays zero')
+
+      ! D. lift of a surface-rich profile: plumes on top of local diffusion, ours and MYNN's
+      lift_ours = sum(m_d*col%zc*q(1,:)) - sum(m_d*col%zc*ql(1,:))
+      xl(1,:) = aerosol
+      call pbl_diffuse_column(delt, m_d, G, xl)
+      x_mynn = aerosol + delt*rnwfa
+      lift_mynn = sum(m_d*col%zc*x_mynn) - sum(m_d*col%zc*xl(1,:))
+      call pbl_edmf_column(delt, m_d, Mu, Eu, xl, nsub, ok)
+      lift_ours = sum(m_d*col%zc*xl(1,:)) - (sum(m_d*col%zc*x_mynn) - lift_mynn)
+      write(*,'(a,es10.3)') 'EDMF: lift of the aerosol beyond local diffusion, gas operator / MYNN = ', &
+                            lift_ours/lift_mynn
+      call check(lift_ours > 0.0_RKIND .and. lift_mynn > 0.0_RKIND, &
+                 'EDMF: the plumes lift a surface-rich profile beyond local diffusion, as MYNN''s own mixing does')
+   end subroutine edmf_case
 
 end program test_mynn_gas_operator

@@ -6,6 +6,7 @@ program test_pbl_gas
    use unit_assert, only: check, finish
    use mpas_atmphys_pbl_gas
    use mpas_atmphys_pbl_diffusion, only: pbl_diffuse_column
+   use mpas_atmphys_pbl_edmf, only: pbl_edmf_updraft_fluxes, pbl_edmf_column
    use mpas_atmphys_tracer_column, only: relative_mass_residual
 
    implicit none
@@ -14,6 +15,8 @@ program test_pbl_gas
    logical :: supported, ok
    character(len=StrKIND) :: reason
    real(kind=RKIND) :: kzq(nz), m_d(nz), dz(nz), G(nz+1), q(2,nz), q_ref(2,nz), q0(2,nz), rho(nz), qv(nz)
+   real(kind=RKIND) :: aw(nz,2), ent(nz,2), Mu(nz+1,2), Eu(nz,2)
+   integer :: nsub
 
    ! Capability gate (sketch §6.2; MYNN modes open stage by stage in P4, nondefault intervals wait for P5).
    call pbl_gas_capability('off', 'off', 'none', 0, 0, supported, reason)
@@ -31,8 +34,10 @@ program test_pbl_gas
    call pbl_gas_capability('bl_mynn', 'sf_mynn', 'none', 0, 1, supported, reason)
    call check(supported, 'MYNN with EDMF off is local diffusion whatever config_mynn_edmf_dd says')
    call pbl_gas_capability('bl_mynn', 'sf_mynn', 'none', 1, 0, supported, reason)
-   call check(.not. supported .and. index(reason, 'MYNN updraft EDMF gas transport is not yet qualified') > 0, &
-              'MYNN updraft EDMF is rejected until it is qualified')
+   call check(supported, 'MYNN with the updraft EDMF (config_mynn_edmf = 1) is supported')
+   call pbl_gas_capability('bl_mynn', 'sf_mynn', 'none', 1, 1, supported, reason)
+   call check(.not. supported .and. index(reason, 'MYNN downdraft EDMF gas transport is not yet qualified') > 0, &
+              'MYNN downdraft EDMF is rejected until it is qualified')
    call pbl_gas_capability('bl_mynn', 'sf_mynn', '00:30:00', 0, 0, supported, reason)
    call check(.not. supported .and. index(reason, 'config_pbl_interval') > 0, &
               'nondefault PBL interval is rejected with MYNN')
@@ -91,6 +96,33 @@ program test_pbl_gas
               'MYNN store: bottom-face exchange with the dry density rho/(1+qv) (bitwise)')
    call pbl_gas_cache_store_mynn_column(2, -kzq, rho, qv, dz, ok)
    call check(.not. ok .and. .not. pbl_gas_active(2), 'a MYNN column with negative exchange is rejected')
+
+   ! MYNN updraft plumes (P4b): a cache with two plumes per column.
+   call pbl_gas_cache_setup(nz, 3, nup=2)
+   aw(:,1) = [0.010_RKIND, 0.012_RKIND, 0.006_RKIND, 0.0_RKIND]
+   aw(:,2) = [0.008_RKIND, 0.0_RKIND, 0.0_RKIND, 0.0_RKIND]
+   ent(:,1) = [0.0_RKIND, 0.1_RKIND, 0.2_RKIND, 0.0_RKIND]
+   ent(:,2) = 0.0_RKIND
+   call pbl_gas_cache_store_mynn_column(1, 0.0_RKIND*kzq, rho, qv, dz, ok)
+   call check(ok .and. .not. pbl_gas_active(1), 'a MYNN column without exchange or plumes is inactive')
+   call pbl_gas_cache_store_mynn_plumes(1, aw, ent, rho, qv, dz, ok)
+   call check(ok .and. pbl_gas_active(1), 'a MYNN column with plumes but no exchange is active')
+   call pbl_gas_cache_store_mynn_column(2, kzq, rho, qv, dz, ok)
+   call pbl_gas_cache_store_mynn_plumes(2, aw, ent, rho, qv, dz, ok)
+   q = q0
+   call pbl_gas_apply(2, 30.0_RKIND, rho/(1.0_RKIND + qv)*dz, q)
+   call pbl_gas_exchange_faces(kzq, rho/(1.0_RKIND + qv), dz, G, ok)
+   q_ref = q0
+   call pbl_diffuse_column(30.0_RKIND, rho/(1.0_RKIND + qv)*dz, G, q_ref)
+   call pbl_edmf_updraft_fluxes(aw, ent, rho/(1.0_RKIND + qv), dz, Mu, Eu, ok)
+   call pbl_edmf_column(30.0_RKIND, rho/(1.0_RKIND + qv)*dz, Mu, Eu, q_ref, nsub, ok)
+   call check(all(transfer(q, [0_I8KIND]) == transfer(q_ref, [0_I8KIND])), &
+              'MYNN apply is local diffusion, then the updraft plumes, with the dry density (bitwise)')
+   call check(any(q(1,:) /= q0(1,:)) .and. all(q(2,:) == 0.0_RKIND), 'the plumes act; a zero gas stays zero')
+   aw(2,1) = -1.0_RKIND
+   call pbl_gas_cache_store_mynn_plumes(2, aw, ent, rho, qv, dz, ok)
+   call check(.not. ok .and. .not. pbl_gas_active(2), 'a column with invalid plumes is reported and left inactive')
+   call pbl_gas_cache_setup(nz, 3)
 
    kzq(2) = -1.0_RKIND
    call pbl_gas_cache_store_column(1, kzq, m_d, dz, ok)

@@ -3,7 +3,7 @@
  use mpas_kind_types,only: kind_phys => RKIND
  use mpas_log
 
- use bl_mynn,only: bl_mynn_run
+ use bl_mynn,only: bl_mynn_run,mynn_edmf_nup
  use bl_mynn_post,only: bl_mynn_post_run
  use bl_mynn_pre,only: bl_mynn_pre_run
 
@@ -51,6 +51,7 @@
                   bl_mynn_dheat_opt , bl_mynn_edmf      , bl_mynn_edmf_dd    , bl_mynn_edmf_mom   , &
                   bl_mynn_edmf_tke  , bl_mynn_output    , bl_mynn_mixscalars , bl_mynn_cloudmix   , &
                   bl_mynn_mixqt     , errmsg            , errflg                                    &
+                 ,edmf_aw_up        , edmf_ent_up                                                       &
 #if(WRF_CHEM == 1)
                  ,mix_chem   , nchem        , kdvel       , ndvel        , chem3         , vd3d   , &
                   frp_mean   , emis_ant_no                                                          &
@@ -231,6 +232,13 @@
     qbuoy,       &!
     qdiss         !
 
+!per-plume updraft export for MICM gas transport (MMM-physics patch, P4b of docs/plans/pbl-transport.md):
+!area-weighted plume velocity [m s-1] on the top face of layer k and the plume's mixing fraction through layer k;
+!written for k = kts..kte.
+ real(kind=kind_phys),intent(out),dimension(ims:ime,kms:kme,jms:jme,mynn_edmf_nup),optional:: &
+    edmf_aw_up,  &!
+    edmf_ent_up   !
+
 #if(WRF_CHEM == 1)
 !--- input arguments for PBL and free-tropospheric mixing of chemical species:
  logical,intent(in):: mix_chem
@@ -295,6 +303,9 @@
 
  real(kind=kind_phys),dimension(its:ite,kts:kte):: &
     exchh_hv,exchm_hv,dqke_hv,qwt_hv,qshear_hv,qbuoy_hv,qdiss_hv
+
+ real(kind=kind_phys),dimension(its:ite,kts:kte,mynn_edmf_nup):: &
+    awup_hv,entup_hv
 
  real(kind=kind_phys),dimension(its:ite,kts:kte):: &
     sqv_hv,sqc_hv,sqi_hv,sqs_hv
@@ -590,7 +601,8 @@
             bl_mynn_output     = mynn_output_l      , &
             bl_mynn_cloudmix   = mynn_mixclouds_l   , &
             bl_mynn_mixqt      = mynn_mixqt_l       , &
-            its = its , ite = ite , kts = kts , kte = kte , kme = kme , errmsg = errmsg , errflg = errflg )
+            its = its , ite = ite , kts = kts , kte = kte , kme = kme , errmsg = errmsg , errflg = errflg , &
+            edmf_aw_up = awup_hv , edmf_ent_up = entup_hv )
 
 
     !--- conversion of tendencies in terms of specific contents to in terms of mixing ratios:
@@ -725,6 +737,15 @@
           exch_m(i,k,j) = exchm_hv(i,k)
        enddo
     enddo
+
+    if(present(edmf_aw_up) .and. present(edmf_ent_up)) then
+       do k = kts,kte
+          do i = its,ite
+             edmf_aw_up(i,k,j,:)  = awup_hv(i,k,:)
+             edmf_ent_up(i,k,j,:) = entup_hv(i,k,:)
+          enddo
+       enddo
+    endif
 
     if(present(qwt)   .and. present(qbuoy) .and. present(qshear) .and. &
        present(qdiss) .and. present(dqke)) then

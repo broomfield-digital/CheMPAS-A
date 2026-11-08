@@ -56,6 +56,7 @@ sources=(
     "$core/physics/physics_wrf/module_bl_mynn.F"
     "$core/physics/mpas_atmphys_tracer_column.F"
     "$core/physics/mpas_atmphys_pbl_diffusion.F"
+    "$core/physics/mpas_atmphys_pbl_edmf.F"
     "$core/physics/mpas_atmphys_pbl_gas.F"
     "$core/physics/mpas_atmphys_cu_gas.F"
     "$core/physics/mpas_atmphys_tracer_transport.F"

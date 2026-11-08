@@ -22,7 +22,7 @@ module mynn_column
    end type column_state
 
    type column_output
-      real(RKIND), dimension(nz) :: exch_h, rqoz, rnwfa, edmf_a, edmf_w
+      real(RKIND), dimension(nz) :: exch_h, rqoz, rnwfa, edmf_a, edmf_w, exch_m, ru, rv, rth, rqv, rqc, qke
       real(RKIND) :: pblh, maxmf
       integer :: kpbl, errflg
    end type column_output
@@ -91,7 +91,7 @@ contains
       col%qfx = merge(1.0e-4_RKIND, 0.0_RKIND, moist)
    end subroutine make_column
 
-   subroutine run_mynn(col, edmf, edmf_dd, output, delt, out, qoz, rqoz, nwfa, rnwfa)
+   subroutine run_mynn(col, edmf, edmf_dd, output, delt, out, qoz, rqoz, nwfa, rnwfa, aw_up, ent_up)
       ! One MYNN step (initflag = 1: MYNN initializes its turbulence from the column first). nwfa, when
       ! given, switches on MYNN's mixing of water-friendly aerosol (MYNN reports that tendency only with
       ! ice-friendly aerosol on as well, so nifa = nwfa). The pinned MYNN mixes ozone but reports a zero
@@ -102,6 +102,9 @@ contains
       type(column_output), intent(out) :: out
       real(RKIND), intent(in), optional :: qoz(nz), nwfa(nz)
       real(RKIND), intent(out), optional :: rqoz(nz), rnwfa(nz)
+      ! MYNN's per-plume updraft export (P4b), passed on as the PBL driver does: an allocatable array
+      ! (1,kme,1,mynn_edmf_nup), absent, or not allocated
+      real(RKIND), dimension(:,:,:,:), allocatable, intent(inout), optional :: aw_up, ent_up
 
       real(RKIND), dimension(1,kme,1) :: dz, u, w, v, th, tt, p, exner, rho, qv, rthraten, qc, qi, qs, qoz3, &
                                          nc, ni, nifa, nwfa3, nbca, cldfra_bl, qc_bl, qi_bl, el_pbl, qke, &
@@ -208,7 +211,8 @@ contains
            rncblten=rncblten, rniblten=rniblten, rnifablten=rnifablten, rnwfablten=rnwfablten, &
            rnbcablten=rnbcablten, rqozblten=rqozblten, edmf_a=edmf_a, edmf_w=edmf_w, edmf_qt=edmf_qt, &
            edmf_thl=edmf_thl, edmf_ent=edmf_ent, edmf_qc=edmf_qc, sub_thl=sub_thl, sub_sqv=sub_sqv, &
-           det_thl=det_thl, det_sqv=det_sqv, exch_h=exch_h, exch_m=exch_m, qke=qke, qwt=qwt, &
+           det_thl=det_thl, det_sqv=det_sqv, exch_h=exch_h, exch_m=exch_m, edmf_aw_up=aw_up, &
+           edmf_ent_up=ent_up, qke=qke, qwt=qwt, &
            qshear=qshear, qbuoy=qbuoy, qdiss=qdiss, sh3d=sh3d, sm3d=sm3d, spp_pbl=0, &
            do_restart=.false., do_DAcycling=.false., initflag=1, bl_mynn_tkeadvect=.false., &
            bl_mynn_tkebudget=0, bl_mynn_cloudpdf=2, bl_mynn_mixlength=2, bl_mynn_closure=2.5_RKIND, &
@@ -220,6 +224,13 @@ contains
 
       out%errflg = errflg
       out%exch_h = exch_h(1,1:nz,1)
+      out%exch_m = exch_m(1,1:nz,1)
+      out%ru = rublten(1,1:nz,1)
+      out%rv = rvblten(1,1:nz,1)
+      out%rth = rthblten(1,1:nz,1)
+      out%rqv = rqvblten(1,1:nz,1)
+      out%rqc = rqcblten(1,1:nz,1)
+      out%qke = qke(1,1:nz,1)
       out%rqoz = rqozblten(1,1:nz,1)
       out%rnwfa = rnwfablten(1,1:nz,1)
       out%edmf_a = edmf_a(1,1:nz,1)
