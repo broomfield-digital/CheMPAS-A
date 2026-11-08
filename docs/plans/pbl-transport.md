@@ -860,7 +860,7 @@ decomposition.
 - Partition files for 2, 4, 8, 12, 16, 24 and 32 ranks exist in
   `~/Data/MPAS/supercell/`.
 
-### Decision needed before Task 2
+### Decision before Task 2 (made 2026-11-08: option 1, repair)
 
 Nondefault PBL intervals are broken in native MPAS, independent of chemistry.
 Gas transport at such intervals cannot be qualified until the native cadence is
@@ -916,6 +916,23 @@ right. The options:
    zero-exchange columns, or a unit test of an all-inactive rank).
 7. **Documentation**: the P5a section, the gate table, and the upstream report
    text for the native defect (filing it is your call).
+
+### Progress
+
+- Tasks 1 and 2 (2026-11-08). `check_pbl_cadence.sh` runs the supercell for 20
+  steps of 3 s and counts scheme calls in the timer summary. Before the repair,
+  with `config_pbl_interval = 00:00:09` YSU, MYNN and their surface layers ran on
+  all 20 steps while integrating with `DT_PBL = 9`. The repair adds `l_pbl`, set
+  from the `pbl` alarm in `physics_timetracker` like `l_conv`, and runs the
+  surface layer, land surface (Noah, and Noah-MP, whose step is now `dt_pbl`),
+  ocean mixed layer, sea ice, surface diagnostics, PBL and gravity-wave drag only
+  when it is set; their tendencies are held in between. Gravity-wave drag has to be
+  in the group: it adds its drag to the held PBL tendency, so it would otherwise add
+  it again every step. After the repair the 9 s interval gives 7 calls (steps 1, 4,
+  …, 19); an interval equal to `config_dt` is bitwise identical to `'none'`, and
+  `'none'` is bitwise identical to the executable before the repair. After 60 s the
+  9 s run differs from the every-step run by at most 1.1e-3 K in θ and 2 m in the
+  PBL height. Gas transport still rejects nondefault intervals until Task 3.
 
 Out of scope here: P5b coupling with #41, OpenMP thread-private buffers (the
 builds use `OPENMP=false`; noted for P6 with the Clang/Flang builds), and the

@@ -25,7 +25,7 @@
  use mpas_atmphys_interface
  use mpas_atmphys_sfc_diagnostics,only: atmphys_sfc_diagnostics
  use mpas_atmphys_update
- use mpas_atmphys_vars, only: l_camlw,l_conv,l_radtlw,l_radtsw
+ use mpas_atmphys_vars, only: l_camlw,l_conv,l_pbl,l_radtlw,l_radtsw
  use mpas_timer
 
  implicit none
@@ -264,6 +264,11 @@
     if(config_radt_sw_scheme.ne.'off') call deallocate_radiation_sw(block%configs)
     if(config_radt_lw_scheme.ne.'off') call deallocate_radiation_lw(block%configs)
 
+    !the surface layer, land surface, ocean mixed layer, sea ice, PBL and gravity wave drag integrate with
+    !dt_pbl: with a nondefault config_pbl_interval they run when the pbl alarm rings, and their tendencies are
+    !held in between (l_pbl, physics_timetracker).
+    if(l_pbl) then
+
     !call to surface-layer scheme:
     if(config_sfclayer_scheme .ne. 'off') then
        call allocate_sfclayer(block%configs)
@@ -340,6 +345,8 @@
 !$OMP END PARALLEL DO
        call deallocate_gwdo(block%configs)
     endif
+
+    endif !l_pbl
 
     !call to convection scheme:
 !$OMP PARALLEL DO

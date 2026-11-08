@@ -144,6 +144,9 @@
  logical:: l_radtlw                   !controls call to longwave radiation parameterization.
  logical:: l_radtsw                   !controls call to shortwave radiation parameterization.
  logical:: l_conv                     !controls call to convective parameterization.
+ logical:: l_pbl                      !controls calls to the surface layer, land surface, ocean mixed-layer,
+                                      !sea-ice, PBL and gravity wave drag parameterizations, which integrate
+                                      !with dt_pbl (config_pbl_interval).
  logical:: l_camlw                    !controls when to save local CAM LW abs and ems arrays.
  logical:: l_diags                    !controls when to calculate physics diagnostics.
  logical:: l_acrain                   !when .true., limit to accumulated rain is applied.

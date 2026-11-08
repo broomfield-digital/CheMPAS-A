@@ -159,6 +159,7 @@
                                   config_radt_sw_scheme
 
  character(len=StrKIND),pointer:: config_conv_interval,    &
+                                  config_pbl_interval,     &
                                   config_radtlw_interval,  &
                                   config_radtsw_interval
 
@@ -189,6 +190,7 @@
  call mpas_pool_get_config(domain%blocklist%configs,'config_radt_sw_scheme'   ,config_radt_sw_scheme   )
 
  call mpas_pool_get_config(domain%blocklist%configs,'config_conv_interval'  ,config_conv_interval  )
+ call mpas_pool_get_config(domain%blocklist%configs,'config_pbl_interval'   ,config_pbl_interval   )
  call mpas_pool_get_config(domain%blocklist%configs,'config_radtlw_interval',config_radtlw_interval)
  call mpas_pool_get_config(domain%blocklist%configs,'config_radtsw_interval',config_radtsw_interval)
 
@@ -298,6 +300,19 @@
        l_conv = .true.
     endif
     call mpas_log_write('--- time to run the convection scheme L_CONV    = $l',logicArgs=(/l_conv/))
+ endif
+
+!check to see if it is time to run the surface layer, land surface and PBL parameterizations. They integrate
+!with dt_pbl, so with a nondefault config_pbl_interval they run when the pbl alarm rings and their tendencies
+!are held in between (as WRF does with bldt):
+ l_pbl = .true.
+ if(trim(config_pbl_interval) /= "none") then
+    l_pbl = .false.
+    if(mpas_is_alarm_ringing(clock,pblAlarmID,ierr=ierr)) then
+       call mpas_reset_clock_alarm(clock,pblAlarmID,ierr=ierr)
+       l_pbl = .true.
+    endif
+    call mpas_log_write('--- time to run the surface layer and PBL schemes L_PBL = $l',logicArgs=(/l_pbl/))
  endif
 
 !check to see if it is time to update ozone to the current julian day in the RRTMG radiation codes:
@@ -698,6 +713,7 @@
  call mpas_log_write('--- n_microp  = $i', intArgs=(/n_microp/))
 !... convection:
  l_conv = .false.
+ l_pbl  = .false.
  n_cu   = nint(dt_cu/dt_dyn)
  n_cu   = max(n_cu,1)
 !... radiation:

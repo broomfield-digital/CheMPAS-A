@@ -9,11 +9,10 @@
  module mpas_atmphys_lsm_noahmpinit
  use mpas_log
  use mpas_pool_routines
- use mpas_timekeeping,only      : mpas_get_timeInterval, mpas_get_clock_timestep
 
  use mpas_atmphys_constants,only: grav => gravity, t0 => svpt0
  use mpas_atmphys_utilities,only: physics_error_fatal
- use mpas_atmphys_vars,only     : mpas_noahmp
+ use mpas_atmphys_vars,only     : mpas_noahmp,dt_pbl
 
  use NoahmpInitMainMod,only : NoahmpInitMain
  use NoahmpIOVarInitMod,only: NoahmpIOVarInitDefault
@@ -238,8 +237,6 @@
  integer,dimension(:),pointer:: isnowxy
  integer,dimension(:),pointer:: irnumsi,irnummi,irnumfi
  
- real(kind=RKIND):: dt
-
  real(kind=RKIND),dimension(:),pointer:: soilcl1,soilcl2,soilcl3,soilcl4
  real(kind=RKIND),dimension(:,:),pointer:: soilcomp
 
@@ -279,14 +276,13 @@
 !--- initialization of Noah-MP run parameters:
  call mpas_pool_get_config(configs,'config_do_restart',do_restart)
  call mpas_pool_get_config(configs,'config_urban_physics',urban_physics)
- call mpas_get_timeInterval(mpas_get_clock_timestep(clock, ierr), dt=dt)
 
  mpas_noahmp%restart_flag = do_restart
  mpas_noahmp%sf_urban_physics = 0
  if(urban_physics) mpas_noahmp%sf_urban_physics = 1
 
  mpas_noahmp%fndsnowh = fndsnowh
- mpas_noahmp%dtbl     = dt
+ mpas_noahmp%dtbl     = dt_pbl   ! Noah-MP runs with the surface layer and PBL, every config_pbl_interval
 
 
 !--- initialization of Noah-MP mesh variables:
