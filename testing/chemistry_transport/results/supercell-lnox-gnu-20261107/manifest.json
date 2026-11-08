@@ -1,0 +1,193 @@
+{
+  "status": "pass",
+  "case": "supercell LNOx + O3",
+  "baseline_directory": "/home/fillmore/Data/CheMPAS-A/baselines/supercell_lnox/20261107T201901Z-2c6ff111",
+  "smoke_directory": "/home/fillmore/Data/CheMPAS-A/baselines/supercell_lnox/smoke-60s-20261107-2c6ff111",
+  "source": {
+    "revision": "2c6ff1114b6eb7ff0afd595eab914885b4e3d2e3",
+    "branch": "chempas-a-pbl",
+    "model_source_changes": false,
+    "build": "fresh build of init_atmosphere_model and atmosphere_model"
+  },
+  "toolchain": {
+    "platform": "Linux x86_64",
+    "compiler": "GNU Fortran 15.2.0",
+    "mpi": "Open MPI 5.0.10",
+    "netcdf_c": "4.10.1",
+    "netcdf_fortran": "4.6.3",
+    "pnetcdf": "1.14.1",
+    "pio": "2.6.9",
+    "precision": "double",
+    "openmp": false
+  },
+  "chemistry": {
+    "musica_fortran": "0.16.5",
+    "musica_revision": "1403e3d22717bc87f3bf9d0aa591caf039c92bbc",
+    "micm_revision": "bb57684a2047f0e58f30b199366294af879e8597",
+    "miem_revision": "9fdf14a189262eecb677862d877ab72b06c95e21",
+    "mechanism_configuration_revision": "82c159ae6d74934318ffd6c405a45c2159065b12",
+    "tuvx_revision": "bbf7dd9a144fa0f0294b3779f3f993818638e20c",
+    "miem_compiled": true,
+    "miem_active": false,
+    "mechanism": "micm_configs/lnox_o3.yaml",
+    "initial_NO_ppbv": 0,
+    "initial_NO2_ppbv": 0,
+    "chemistry_interval_seconds": 3,
+    "photolysis_interval_seconds": 600,
+    "photolysis_latitude_degrees": 35.86,
+    "photolysis_longitude_degrees": -97.93,
+    "lnox_gating": "altitude",
+    "lnox_source_rate_ppbv_s": 0.5,
+    "lnox_w_threshold_m_s": 5,
+    "lnox_w_ref_m_s": 10,
+    "lnox_height_range_m": [
+      5000,
+      12000
+    ],
+    "initial_O3_nominal_ppbv": 50,
+    "initial_O3_kg_kg": 8.275862068965518e-08,
+    "initializer_dry_air_molar_mass_kg_mol": 0.029,
+    "host_dry_air_molar_mass_kg_mol": 0.0289644,
+    "initial_O3_host_ppbv": 49.93862068965518
+  },
+  "physics": {
+    "suite": "none",
+    "pbl": "off",
+    "convection": "off",
+    "microphysics": "mp_kessler",
+    "monotonic_advection": true
+  },
+  "integration": {
+    "mpi_ranks": 8,
+    "start": "0000-01-01_18:00:00",
+    "end": "0000-01-01_20:00:00",
+    "dt_seconds": 3,
+    "duration_seconds": 7200,
+    "steps": 2400,
+    "output_interval_seconds": 600,
+    "output_records": 13,
+    "cells": 28080,
+    "levels": 60
+  },
+  "external_revisions": {
+    "physics_mmm": "a4baf7f3243d1db0dbc5f63473f895bdbdc05c30",
+    "physics_noaa/UGWP": "c1c893edcf171af5639af60e3a3a528816f6cc2b"
+  },
+  "input_provenance": {
+    "local_source": "/home/fillmore/Data/CheMPAS-A/supercell",
+    "upstream_archive_url": "https://www2.mmm.ucar.edu/projects/mpas/test_cases/v7.0/supercell.tar.gz",
+    "acquisition": "Reused local grid and eight-rank partition; generated fresh init with this revision. Archive was not re-downloaded.",
+    "tuvx_data": "git archive of configs/tuvx/data at pinned MUSICA revision",
+    "physics_tables": "Reused existing MPAS-Data v8.2 compatible tables; every file checksummed."
+  },
+  "commands": {
+    "build": "bash /home/fillmore/Data/CheMPAS-A/baselines/supercell_lnox/20261107T201901Z-2c6ff111/build.sh",
+    "prepare": "python testing/chemistry_transport/prepare_supercell_baseline.py /home/fillmore/Data/CheMPAS-A/baselines/supercell_lnox/20261107T201901Z-2c6ff111 --input-dir /home/fillmore/Data/CheMPAS-A/supercell --musica-source /home/fillmore/NSF-NCAR/MUSICA",
+    "initialize": "bash /home/fillmore/Data/CheMPAS-A/baselines/supercell_lnox/20261107T201901Z-2c6ff111/initialize.sh",
+    "run": "bash /home/fillmore/Data/CheMPAS-A/baselines/supercell_lnox/20261107T201901Z-2c6ff111/run.sh",
+    "check": "python testing/chemistry_transport/check_supercell_baseline.py /home/fillmore/Data/CheMPAS-A/baselines/supercell_lnox/20261107T201901Z-2c6ff111",
+    "smoke_60s": "bash testing/chemistry_transport/run_supercell_smoke.sh BASELINE_DIR NEW_RUN_DIR 60",
+    "smoke_600s": "bash testing/chemistry_transport/run_supercell_smoke.sh BASELINE_DIR NEW_RUN_DIR 600"
+  },
+  "qualification_scope": "Resolved advection and reactive LNOx regression. PBL and parameterized convection remain disabled. Full reactive inventories are recorded; no isolated transport or integrated lightning-source budget is claimed.",
+  "provenance_files": [
+    "input-checksums.json",
+    "library-checksums.json",
+    "external-revisions.json",
+    "conda-explicit.txt",
+    "musica-fortran.pc",
+    "libpio.settings",
+    "atmosphere-ldd.txt",
+    "executable-sha256.txt",
+    "run-time.txt"
+  ],
+  "developer_smoke": {
+    "duration_seconds": 60,
+    "status": "pass",
+    "model_steps": 20,
+    "output_records": 3,
+    "model_exit_status": 0,
+    "error_messages": 0,
+    "critical_error_messages": 0,
+    "all_numeric_records_finite_and_unmasked": true,
+    "activation_requirement": "Photolysis and successful MICM steps; lightning production is not required before storm spin-up.",
+    "reference_comparison": {
+      "path": "testing/chemistry_transport/results/supercell-lnox-gnu-20261107/smoke-60s-summary.json",
+      "result": "exact saved-field match",
+      "fields_compared": 20
+    },
+    "startup_diagnostics": {
+      "comparison": "First 20 model steps: global w/u and six scalar minima/maxima",
+      "match": "exact log values",
+      "diagnostic_lines_compared": 160,
+      "scope": "Diagnostic extrema only; not a full-state equivalence test."
+    },
+    "wall_time": "00:01:13.91 (concurrent with full baseline)",
+    "ten_minute_option": "Available; not executed in this baseline session."
+  },
+  "result": {
+    "completed_steps": 2400,
+    "output_records": 13,
+    "mpi_exit_status": 0,
+    "error_messages": 0,
+    "critical_error_messages": 0,
+    "warning_messages": 11,
+    "all_numeric_records_finite_and_unmasked": true,
+    "chemical_species_nonnegative": true,
+    "dry_air_mass_max_relative_drift": 2.1813278079523034e-16,
+    "Ox_max_relative_drift": 2.4131205150839533e-16,
+    "recorded_inputs_unchanged": 228,
+    "wall_time": "00:59:41.68",
+    "restart_output": "restart.0000-01-01_20.00.00.nc",
+    "restart_equivalence_tested": false
+  },
+  "started_utc": "2026-11-07T20:22:27Z",
+  "finished_utc": "2026-11-07T21:22:09Z",
+  "warnings": {
+    "model": [
+      "WARNING: Variable qc not in input file.",
+      "WARNING: Variable qr not in input file.",
+      "WARNING: The specification of the off-centering parameter for the vertically implicit",
+      "WARNING: acoustic integration using config_epssm in the &nhyd_model namelist group is",
+      "WARNING: no longer supported.",
+      "WARNING: Please use the namelist options",
+      "WARNING:   config_epssm_minimum",
+      "WARNING:   config_epssm_maximum",
+      "WARNING:   config_epssm_transition_bottom_z",
+      "WARNING:   config_epssm_transition_top_z",
+      "WARNING: in the &damping namelist group to specify level-dependent off-centering parameters."
+    ],
+    "interpretation": "Fresh idealized init omits qc/qr (model initializes them to zero); the inherited config_epssm option is deprecated. These baseline inputs were retained and are checksummed.",
+    "initialization_mpi": "Initializer exited successfully with TCP interface-probing messages; the main run and smoke test used single-node self,sm transport and had empty run.out files."
+  },
+  "output_files": {
+    "output.nc": {
+      "bytes": 2662108564,
+      "sha256": "531a974cea9e696b6cf832821f56330148d8a39a57f78bf8002f35a8c8732004"
+    },
+    "restart.0000-01-01_20.00.00.nc": {
+      "bytes": 974534136,
+      "sha256": "4b49b0a5579c2400bb99a9ecf42f013ac4889c60795ab45bfd1cad3c633c8321"
+    },
+    "summary.json": {
+      "bytes": 19210,
+      "sha256": "14013b3a994b1036b6830d8fa90cebb2145313ae91126f5841c7ad433278703b"
+    },
+    "baseline.png": {
+      "bytes": 172234,
+      "sha256": "d2eff6439fce56159a9f6b5060772128ef54875e46f3a7185faf2f791a47e319"
+    }
+  },
+  "recorded_shell_scripts": {
+    "environment.sh": "export PATH=/home/fillmore/miniforge3/envs/mpas/bin:$PATH\nexport NETCDF=/home/fillmore/miniforge3/envs/mpas\nexport NETCDFF=$NETCDF\nexport PNETCDF=$NETCDF\nexport PIO=/home/fillmore/software\nexport MUSICA_PREFIX=/home/fillmore/software/musica-1403e3d22717bc87f3bf9d0aa591caf039c92bbc\nexport PKG_CONFIG_PATH=$MUSICA_PREFIX/lib/pkgconfig:$NETCDF/lib/pkgconfig\nexport LD_LIBRARY_PATH=$MUSICA_PREFIX/lib:$NETCDF/lib\nexport OMPI_FC=gfortran OMPI_CC=gcc OMPI_CXX=g++\nexport OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1\n# This baseline uses one node; avoid probing unrelated TCP interfaces.\nexport OMPI_MCA_btl=self,sm\n",
+    "build.sh": "#!/usr/bin/env bash\nset -euo pipefail\nrun_dir=$(cd \"$(dirname \"$0\")\" && pwd)\nsource \"$run_dir/environment.sh\"\ncd /home/fillmore/BroomfieldDigital/CheMPAS-A\ngit rev-parse HEAD > \"$run_dir/provenance/chempas_revision\"\ngit status --short > \"$run_dir/provenance/source_status_before_build\"\nconda list -p \"$NETCDF\" --explicit > \"$run_dir/provenance/conda-explicit.txt\"\ncp \"$MUSICA_PREFIX/lib/pkgconfig/musica-fortran.pc\" \"$PIO/lib/libpio.settings\" \"$run_dir/provenance/\"\ngfortran --version > \"$run_dir/provenance/gfortran-version.txt\"\nmpiexec --version > \"$run_dir/provenance/mpi-version.txt\"\nmake -j8 gfortran CORE=init_atmosphere PRECISION=double OPENMP=false PIO=\"$PIO\" AUTOCLEAN=true > \"$run_dir/build_init.log\" 2>&1\ncp init_atmosphere_model \"$run_dir/bin/\"\ncp .build_opts.init_atmosphere \"$run_dir/provenance/\"\nmake clean CORE=atmosphere > \"$run_dir/build_clean.log\" 2>&1\nmake -j8 gfortran CORE=atmosphere PRECISION=double OPENMP=false PIO=\"$PIO\" MUSICA=true AUTOCLEAN=true > \"$run_dir/build_atmosphere.log\" 2>&1\ncp atmosphere_model \"$run_dir/bin/\"\ncp .build_opts.atmosphere \"$run_dir/provenance/\"\nldd atmosphere_model > \"$run_dir/provenance/atmosphere-ldd.txt\"\nsha256sum \"$run_dir\"/bin/* > \"$run_dir/provenance/executable-sha256.txt\"\n",
+    "initialize.sh": "#!/usr/bin/env bash\nset -euo pipefail\ncd \"$(dirname \"$0\")\"\nsource environment.sh\ntest ! -e supercell_init.nc\nmpiexec -n 8 ./init_atmosphere_model > init_run.out 2>&1\npython /home/fillmore/BroomfieldDigital/CheMPAS-A/scripts/init_lnox_o3.py -i supercell_init.nc > initialize_tracers.log 2>&1\nsha256sum supercell_init.nc supercell_grid.nc supercell.graph.info.part.8 > provenance/mesh-init-sha256.txt\n",
+    "run.sh": "#!/usr/bin/env bash\nset -euo pipefail\ncd \"$(dirname \"$0\")\"\nsource environment.sh\ntest ! -e output.nc\ndate -u +%FT%TZ > provenance/run-started-utc\nset +e\n/usr/bin/time -v -o provenance/run-time.txt mpiexec -n 8 ./atmosphere_model > run.out 2>&1\nrun_status=$?\nset -e\nprintf '%s\\n' \"$run_status\" > provenance/run-exit-status\ndate -u +%FT%TZ > provenance/run-finished-utc\nexit \"$run_status\"\n"
+  },
+  "helper_script_sha256": {
+    "plot_supercell_baseline.py": "d4044595750e9dee70429cb1c0735f43e3c099f393e41c5709cf85b575a3fa48",
+    "prepare_supercell_baseline.py": "b64045602a93b16c1602e04943f93fdd35ae71e36947eec8e651e1ef48169076",
+    "run_supercell_smoke.sh": "a1ca134c5abe8893033a27c0d88137b65629b93cca6dc1604f71912b0d46d550",
+    "check_supercell_baseline.py": "96bba99d07f038057ced4848ceac7c7fcbc2c8344506dbe81022391bfd3ead30"
+  }
+}

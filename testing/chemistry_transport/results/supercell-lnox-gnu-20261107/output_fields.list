@@ -1,0 +1,17 @@
+scalars
+latCell
+lonCell
+zgrid
+xtime
+u
+w
+pressure
+rho
+theta
+j_jNO2
+areaCell
+indexToCellID
+zz
+rho_zz
+rainnc
+rainc

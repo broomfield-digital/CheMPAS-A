@@ -1,0 +1,14 @@
+{
+  "/home/fillmore/software/musica-1403e3d22717bc87f3bf9d0aa591caf039c92bbc/lib/libmusica-fortran.a": "047e1e1f60a6b679dc166f55514bf23a1eed0ef47540192c2bbb1068a52f1dff",
+  "/home/fillmore/software/musica-1403e3d22717bc87f3bf9d0aa591caf039c92bbc/lib/libmusica.a": "93f205cf3f85cdbeb212621563d40600d9ef7728aa936c5eb812de90db61a535",
+  "/home/fillmore/software/musica-1403e3d22717bc87f3bf9d0aa591caf039c92bbc/lib/libmiem.a": "1066e8bd91cadd7cd7e315ce2de6379a9602e4b38744e5a902c8233087cf4b83",
+  "/home/fillmore/software/musica-1403e3d22717bc87f3bf9d0aa591caf039c92bbc/lib/libmechanism_configuration.a": "1e114df0c3adc535eb00c07bee9ecb5271d6a72968616ea192b6273f1465da93",
+  "/home/fillmore/software/musica-1403e3d22717bc87f3bf9d0aa591caf039c92bbc/lib/libyaml-cpp.a": "19c50c5e9eec27c81501d4fd6dd2da313fb18dd33d0d71161fbed597c81680f4",
+  "/home/fillmore/software/lib/libpioc.a": "f3918fdda0b52afbe2c96a1a9e2c2bf6161a961356f8eb3e6821e174d3ed5a2b",
+  "/home/fillmore/software/lib/libpiof.a": "8bf39492380f8a866dc64c201b07714882be7f38218af95660415cca17a8a391",
+  "/home/fillmore/miniforge3/envs/mpas/lib/libnetcdf.so": "127952421a8ba1985c3a635fe026a34f88c8d5e3f4b834718b475808051db483",
+  "/home/fillmore/miniforge3/envs/mpas/lib/libnetcdff.so": "70f3439b63d3919e8f38be7e794b4d1039b1d952a27bbeb46614bab343e50a8a",
+  "/home/fillmore/miniforge3/envs/mpas/lib/libpnetcdf.so": "f9997257c93e87b558cee5afaba924b7b52ac839c26ed9776053534ec52013f6",
+  "/home/fillmore/miniforge3/envs/mpas/lib/libgfortran.so": "13710bb828153d6da4d9e290b40709e92f38615b9e5247f3af3c35779ee1831b",
+  "/home/fillmore/miniforge3/envs/mpas/lib/libmpi.so": "3a86acbf6fc9a407a15e5d7780c3c20228f3e545849e147ba37124204f216bc8"
+}

@@ -1,0 +1,348 @@
+{
+  "case": "supercell_lnox",
+  "purpose": "resolved-advection and coupled-chemistry regression",
+  "pbl_scheme": "off",
+  "convection_scheme": "off",
+  "mpi_ranks": 8,
+  "dt_seconds": 3.0,
+  "simulated_seconds": 60,
+  "expected_steps": 20,
+  "all_numeric_records_finite_and_unmasked": true,
+  "completed_steps": 20,
+  "ppbv_dry_air_molar_mass_kg_mol": 0.0289644,
+  "initial_O3_kg_kg": 8.275862068965518e-08,
+  "initial_O3_note": "Nominal 50 ppbv uses init_lnox_o3.py's 0.029 kg/mol air convention; reported ppbv uses the host's 0.0289644 kg/mol.",
+  "startup_warnings": [
+    "WARNING: Variable qc not in input file.",
+    "WARNING: Variable qr not in input file.",
+    "WARNING: The specification of the off-centering parameter for the vertically implicit",
+    "WARNING: acoustic integration using config_epssm in the &nhyd_model namelist group is",
+    "WARNING: no longer supported.",
+    "WARNING: Please use the namelist options",
+    "WARNING:   config_epssm_minimum",
+    "WARNING:   config_epssm_maximum",
+    "WARNING:   config_epssm_transition_bottom_z",
+    "WARNING:   config_epssm_transition_top_z",
+    "WARNING: in the &damping namelist group to specify level-dependent off-centering parameters."
+  ],
+  "rank_error_files": [],
+  "chemistry_recovery_messages": [],
+  "variables": {
+    "qv": {
+      "min": 2.4298663612482044e-05,
+      "max": 0.014000000000000064,
+      "dtype": "float64",
+      "shape": [
+        3,
+        28080,
+        60
+      ],
+      "values_sha256": "9af287bbeba8d4a3b8b3e47d3fd8c67118b43f1be263b235bfbe4eeb4ced6e46"
+    },
+    "qc": {
+      "min": 0.0,
+      "max": 0.0,
+      "dtype": "float64",
+      "shape": [
+        3,
+        28080,
+        60
+      ],
+      "values_sha256": "baf97b20e60589ba1e6fed92f5b5dc8bbb30a57c9338d1341a59a5daaca369c7"
+    },
+    "qr": {
+      "min": 0.0,
+      "max": 0.0,
+      "dtype": "float64",
+      "shape": [
+        3,
+        28080,
+        60
+      ],
+      "values_sha256": "baf97b20e60589ba1e6fed92f5b5dc8bbb30a57c9338d1341a59a5daaca369c7"
+    },
+    "qO3": {
+      "min": 8.2758620689655e-08,
+      "max": 8.275862068965538e-08,
+      "dtype": "float64",
+      "shape": [
+        3,
+        28080,
+        60
+      ],
+      "values_sha256": "490935b448d6a847bfce0ea31df14378d40ded18a8c64a977383d124d67e6e87"
+    },
+    "qNO2": {
+      "min": 0.0,
+      "max": 0.0,
+      "dtype": "float64",
+      "shape": [
+        3,
+        28080,
+        60
+      ],
+      "values_sha256": "baf97b20e60589ba1e6fed92f5b5dc8bbb30a57c9338d1341a59a5daaca369c7"
+    },
+    "qNO": {
+      "min": 0.0,
+      "max": 0.0,
+      "dtype": "float64",
+      "shape": [
+        3,
+        28080,
+        60
+      ],
+      "values_sha256": "baf97b20e60589ba1e6fed92f5b5dc8bbb30a57c9338d1341a59a5daaca369c7"
+    },
+    "latCell": {
+      "min": 0.0,
+      "max": 0.0,
+      "dtype": "float64",
+      "shape": [
+        28080
+      ],
+      "values_sha256": "3e020bab761693a65390027f0b3fcc73ab892d9a8af26bf2717e1602208a56c3"
+    },
+    "lonCell": {
+      "min": 0.0,
+      "max": 0.0,
+      "dtype": "float64",
+      "shape": [
+        28080
+      ],
+      "values_sha256": "3e020bab761693a65390027f0b3fcc73ab892d9a8af26bf2717e1602208a56c3"
+    },
+    "zgrid": {
+      "min": 0.0,
+      "max": 50000.0,
+      "dtype": "float64",
+      "shape": [
+        28080,
+        61
+      ],
+      "values_sha256": "2aeaf85ccecf25eb385b73602aaeac3c5dcf68ab6f907040ad70a7752b7538fd"
+    },
+    "u": {
+      "min": -13.127574468006804,
+      "max": 13.12757446800679,
+      "dtype": "float64",
+      "shape": [
+        3,
+        84240,
+        60
+      ],
+      "values_sha256": "a4e6cc6824580c021dfd016430d9c84ed077ee95177cf5b35ccd6f1c6fee19a0"
+    },
+    "w": {
+      "min": -0.15402794232267528,
+      "max": 0.6460792639572951,
+      "dtype": "float64",
+      "shape": [
+        3,
+        28080,
+        61
+      ],
+      "values_sha256": "59fc7ac0041236ed9e6aef07031bd6d32e05b7e7343957f9835fdb33345ac9bf"
+    },
+    "pressure": {
+      "min": 68.75694782814196,
+      "max": 98324.78506968831,
+      "dtype": "float64",
+      "shape": [
+        3,
+        28080,
+        60
+      ],
+      "values_sha256": "7259e2809a80c5ff9acef911e971b22a1c3cb25aa9cad9ce060062ec1c11d48f"
+    },
+    "rho": {
+      "min": 0.0009804314993370163,
+      "max": 1.1203722162727792,
+      "dtype": "float64",
+      "shape": [
+        3,
+        28080,
+        60
+      ],
+      "values_sha256": "5f657bce18ff853f34ac5adb0f037580816481ba00c4f25d69ef1779524de94b"
+    },
+    "theta": {
+      "min": 300.4981322648253,
+      "max": 1914.126784752311,
+      "dtype": "float64",
+      "shape": [
+        3,
+        28080,
+        60
+      ],
+      "values_sha256": "543f54a34fb9c447da7afdeab4feb32b1b635c43c824c36c36d607163ff56a84"
+    },
+    "j_jNO2": {
+      "min": 0.0,
+      "max": 0.011810359860519364,
+      "dtype": "float64",
+      "shape": [
+        3,
+        28080,
+        60
+      ],
+      "values_sha256": "87fb58768ba544e5ec4385d89b22a5a356df69e7e85c6883e53411944f1a57d6"
+    },
+    "areaCell": {
+      "min": 251468.1172470369,
+      "max": 251468.1172470369,
+      "dtype": "float64",
+      "shape": [
+        28080
+      ],
+      "values_sha256": "2a0a14b183193557d576e59f95976129863cf85d2ecd0e68f9ccce26dda7e05c"
+    },
+    "indexToCellID": {
+      "min": 1.0,
+      "max": 28080.0,
+      "dtype": "int32",
+      "shape": [
+        28080
+      ],
+      "values_sha256": "ad0a1f23ecc20e98aac091eb8491bf555de2a8fadf8e485b6ec9a7e6936edf7f"
+    },
+    "zz": {
+      "min": 1.0,
+      "max": 1.0,
+      "dtype": "float64",
+      "shape": [
+        28080,
+        60
+      ],
+      "values_sha256": "eaf0d0bb0c045e58494f9015b1dc3116adca4bbdb04de730203786c932f3d6fd"
+    },
+    "rho_zz": {
+      "min": 0.0009804314993370163,
+      "max": 1.1203722162727792,
+      "dtype": "float64",
+      "shape": [
+        3,
+        28080,
+        60
+      ],
+      "values_sha256": "5f657bce18ff853f34ac5adb0f037580816481ba00c4f25d69ef1779524de94b"
+    },
+    "rainnc": {
+      "min": 0.0,
+      "max": 0.0,
+      "dtype": "float64",
+      "shape": [
+        3,
+        28080
+      ],
+      "values_sha256": "91f4a079706b365777b6ed353cc9a798459bfe496a49b0d1caa12bfa97304f19"
+    }
+  },
+  "records": [
+    {
+      "xtime": "0000-01-01_18:00:00",
+      "dry_air_mass_kg": 71630682665104.75,
+      "w_max_m_s": 0.0,
+      "w_min_m_s": 0.0,
+      "lightning_gate_cell_levels_at_output": 0,
+      "species": {
+        "qNO": {
+          "mass_kg": 0.0,
+          "min_kg_kg": 0.0,
+          "max_kg_kg": 0.0,
+          "max_ppbv": 0.0
+        },
+        "qNO2": {
+          "mass_kg": 0.0,
+          "min_kg_kg": 0.0,
+          "max_kg_kg": 0.0,
+          "max_ppbv": 0.0
+        },
+        "qO3": {
+          "mass_kg": 5928056.496422463,
+          "min_kg_kg": 8.275862068965518e-08,
+          "max_kg_kg": 8.275862068965518e-08,
+          "max_ppbv": 49.93862068965518
+        }
+      },
+      "NOx_mol": 0.0,
+      "Ox_mol": 123501177.00880131
+    },
+    {
+      "xtime": "0000-01-01_18:00:30",
+      "dry_air_mass_kg": 71630682665104.75,
+      "w_max_m_s": 0.32953509647732354,
+      "w_min_m_s": -0.08015101768039966,
+      "lightning_gate_cell_levels_at_output": 0,
+      "species": {
+        "qNO": {
+          "mass_kg": 0.0,
+          "min_kg_kg": 0.0,
+          "max_kg_kg": 0.0,
+          "max_ppbv": 0.0
+        },
+        "qNO2": {
+          "mass_kg": 0.0,
+          "min_kg_kg": 0.0,
+          "max_kg_kg": 0.0,
+          "max_ppbv": 0.0
+        },
+        "qO3": {
+          "mass_kg": 5928056.496422463,
+          "min_kg_kg": 8.275862068965506e-08,
+          "max_kg_kg": 8.275862068965534e-08,
+          "max_ppbv": 49.93862068965528
+        }
+      },
+      "NOx_mol": 0.0,
+      "Ox_mol": 123501177.00880131
+    },
+    {
+      "xtime": "0000-01-01_18:01:00",
+      "dry_air_mass_kg": 71630682665104.75,
+      "w_max_m_s": 0.6460792639572951,
+      "w_min_m_s": -0.15402794232267528,
+      "lightning_gate_cell_levels_at_output": 0,
+      "species": {
+        "qNO": {
+          "mass_kg": 0.0,
+          "min_kg_kg": 0.0,
+          "max_kg_kg": 0.0,
+          "max_ppbv": 0.0
+        },
+        "qNO2": {
+          "mass_kg": 0.0,
+          "min_kg_kg": 0.0,
+          "max_kg_kg": 0.0,
+          "max_ppbv": 0.0
+        },
+        "qO3": {
+          "mass_kg": 5928056.496422462,
+          "min_kg_kg": 8.2758620689655e-08,
+          "max_kg_kg": 8.275862068965538e-08,
+          "max_ppbv": 49.9386206896553
+        }
+      },
+      "NOx_mol": 0.0,
+      "Ox_mol": 123501177.0088013
+    }
+  ],
+  "times": [
+    "0000-01-01_18:00:00",
+    "0000-01-01_18:00:30",
+    "0000-01-01_18:01:00"
+  ],
+  "n_cells": 28080,
+  "n_levels": 60,
+  "max_rho_vs_zz_rho_zz_relative_difference": 0.0,
+  "dry_air_mass_kg_max_relative_drift": 0.0,
+  "Ox_mol_max_relative_drift": 1.2065602575419766e-16,
+  "inventory_notes": "Inventories use areaCell * layer thickness * dry rho. NOx = NO + NO2 in moles includes lightning production; Ox = O3 + NO2 in moles is invariant for these two chemical reactions and the NO-only source. Reported drifts characterize this coupled baseline; no isolated PBL/convection budget is claimed. Lightning activation is sampled at output times, not integrated over all steps. Optimized MPAS writes a regular log only for rank 0; all rank error/abort files and the MPI exit status are checked.",
+  "status": "pass",
+  "qualification": "development smoke only",
+  "reference_comparison": {
+    "path": "testing/chemistry_transport/results/supercell-lnox-gnu-20261107/smoke-60s-summary.json",
+    "result": "exact saved-field match",
+    "fields_compared": 20
+  }
+}

@@ -1,0 +1,41 @@
+# PIO Configuration Summary
+==============================
+
+# General
+-------
+PIO Version:		2.6.9
+Configured On:		Sun Apr  5 05:13:41 PM MDT 2026
+
+Host System:		x86_64
+-Linux
+-6.17.9-76061709-generic
+
+Build Directory: 	/home/fillmore/EarthSystem/ParallelIO/build
+Install Prefix:         /home/fillmore/software
+
+# Compiling Options
+-----------------
+C Compiler:		GNU 15.2.0
+CFLAGS:			 -std=gnu99  
+CPPFLAGS:		 -DLINUX -DCPRGNU -I/home/fillmore/EarthSystem/ParallelIO/build -I/home/fillmore/EarthSystem/ParallelIO/src/clib -I/home/fillmore/EarthSystem/ParallelIO/build/src/clib -I$<BUILD_INTERFACE:/home/fillmore/EarthSystem/ParallelIO/src/clib> -I$<BUILD_INTERFACE:/home/fillmore/EarthSystem/ParallelIO/src/clib/../ncint> -I/home/fillmore/miniconda3/envs/mpas/include -I/home/fillmore/miniconda3/envs/mpas/include -I$<BUILD_INTERFACE:>
+LDFLAGS:		 
+Shared Library:		no
+Static Library:		yes
+Extra libraries:	
+
+Fortran Compiler:       GNU 15.2.0
+FFLAGS:                  -fallow-argument-mismatch
+FCFLAGS:                
+More Fortran Flags:	 -DLINUX -DCPRGNU -I$<BUILD_INTERFACE:/home/fillmore/EarthSystem/ParallelIO/build> -I$<BUILD_INTERFACE:/home/fillmore/EarthSystem/ParallelIO/src/flib> -I$<BUILD_INTERFACE:/home/fillmore/EarthSystem/ParallelIO/build/src/flib> -I/home/fillmore/miniconda3/envs/mpas/include -I$<BUILD_INTERFACE:>
+
+# Features
+--------
+PnetCDF Support:	yes
+SZIP Write Support:	yes
+Parallel Filters:	no
+NetCDF/HDF5 Support:	yes
+NetCDF/HDF5 Par I/O:	no
+NetCDF Integration:	no
+PIO Logging:		no
+MPIEXEC:		mpiexec
+Fortran:		yes

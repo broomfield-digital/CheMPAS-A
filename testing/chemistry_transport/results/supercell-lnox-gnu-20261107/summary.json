@@ -1,0 +1,643 @@
+{
+  "case": "supercell_lnox",
+  "purpose": "resolved-advection and coupled-chemistry regression",
+  "pbl_scheme": "off",
+  "convection_scheme": "off",
+  "mpi_ranks": 8,
+  "dt_seconds": 3.0,
+  "simulated_seconds": 7200,
+  "expected_steps": 2400,
+  "all_numeric_records_finite_and_unmasked": true,
+  "completed_steps": 2400,
+  "ppbv_dry_air_molar_mass_kg_mol": 0.0289644,
+  "initial_O3_kg_kg": 8.275862068965518e-08,
+  "initial_O3_note": "Nominal 50 ppbv uses init_lnox_o3.py's 0.029 kg/mol air convention; reported ppbv uses the host's 0.0289644 kg/mol.",
+  "startup_warnings": [
+    "WARNING: Variable qc not in input file.",
+    "WARNING: Variable qr not in input file.",
+    "WARNING: The specification of the off-centering parameter for the vertically implicit",
+    "WARNING: acoustic integration using config_epssm in the &nhyd_model namelist group is",
+    "WARNING: no longer supported.",
+    "WARNING: Please use the namelist options",
+    "WARNING:   config_epssm_minimum",
+    "WARNING:   config_epssm_maximum",
+    "WARNING:   config_epssm_transition_bottom_z",
+    "WARNING:   config_epssm_transition_top_z",
+    "WARNING: in the &damping namelist group to specify level-dependent off-centering parameters."
+  ],
+  "rank_error_files": [],
+  "chemistry_recovery_messages": [],
+  "variables": {
+    "qv": {
+      "min": 2.3636532870749518e-05,
+      "max": 0.015944270709541925,
+      "dtype": "float64",
+      "shape": [
+        13,
+        28080,
+        60
+      ],
+      "values_sha256": "85d7a5b1c1c80c049457df29fec0b075764c783dcfcaf30b4f906de88ed65af9"
+    },
+    "qc": {
+      "min": 0.0,
+      "max": 0.0056311010189929595,
+      "dtype": "float64",
+      "shape": [
+        13,
+        28080,
+        60
+      ],
+      "values_sha256": "633cc43472bd09319d8206cdc01e292ad5513985cee43745136336953cc6babb"
+    },
+    "qr": {
+      "min": 0.0,
+      "max": 0.01716559087716818,
+      "dtype": "float64",
+      "shape": [
+        13,
+        28080,
+        60
+      ],
+      "values_sha256": "f8800a4ecc785ba136b1f59cf98581343595f1099428f30dad090032e27379ff"
+    },
+    "qO3": {
+      "min": 9.394098815754123e-09,
+      "max": 8.275862068967132e-08,
+      "dtype": "float64",
+      "shape": [
+        13,
+        28080,
+        60
+      ],
+      "values_sha256": "12add25884d6a575a5b92ae561bc66f89fd460750a0286aa7e412ac45e160a7a"
+    },
+    "qNO2": {
+      "min": 0.0,
+      "max": 7.030766679578956e-08,
+      "dtype": "float64",
+      "shape": [
+        13,
+        28080,
+        60
+      ],
+      "values_sha256": "687a44ed3019937f5ee57805a01f8a731ce0dd2f0c07c0a2313739cff42c9cae"
+    },
+    "qNO": {
+      "min": 0.0,
+      "max": 3.3472912690346036e-07,
+      "dtype": "float64",
+      "shape": [
+        13,
+        28080,
+        60
+      ],
+      "values_sha256": "c033889e669918144d05d01bd046ec061a62069227d763992ab21eb47f572ce4"
+    },
+    "latCell": {
+      "min": 0.0,
+      "max": 0.0,
+      "dtype": "float64",
+      "shape": [
+        28080
+      ],
+      "values_sha256": "3e020bab761693a65390027f0b3fcc73ab892d9a8af26bf2717e1602208a56c3"
+    },
+    "lonCell": {
+      "min": 0.0,
+      "max": 0.0,
+      "dtype": "float64",
+      "shape": [
+        28080
+      ],
+      "values_sha256": "3e020bab761693a65390027f0b3fcc73ab892d9a8af26bf2717e1602208a56c3"
+    },
+    "zgrid": {
+      "min": 0.0,
+      "max": 50000.0,
+      "dtype": "float64",
+      "shape": [
+        28080,
+        61
+      ],
+      "values_sha256": "2aeaf85ccecf25eb385b73602aaeac3c5dcf68ab6f907040ad70a7752b7538fd"
+    },
+    "u": {
+      "min": -39.65402158725625,
+      "max": 39.65402158725519,
+      "dtype": "float64",
+      "shape": [
+        13,
+        84240,
+        60
+      ],
+      "values_sha256": "a64e9c727f1c241afc28ba52e18592b0784d2703e6d195c1d9fce1c7843bf809"
+    },
+    "w": {
+      "min": -22.233422136935058,
+      "max": 46.73333299374934,
+      "dtype": "float64",
+      "shape": [
+        13,
+        28080,
+        61
+      ],
+      "values_sha256": "46ea610b03e8938b71fe62bed482085888f77f3d2e586ecc08a0fd451379825a"
+    },
+    "pressure": {
+      "min": 68.29036767494702,
+      "max": 98539.51913847351,
+      "dtype": "float64",
+      "shape": [
+        13,
+        28080,
+        60
+      ],
+      "values_sha256": "796dc805a035fe34b8eefac9cd17c6c026c6ff3ac464338c513469372145d9f7"
+    },
+    "rho": {
+      "min": 0.0009687478999884555,
+      "max": 1.1617283089230432,
+      "dtype": "float64",
+      "shape": [
+        13,
+        28080,
+        60
+      ],
+      "values_sha256": "c1f45fe9f0f483948108bb337472bc35f252d4d8706abfc2d49612f5de8d10a1"
+    },
+    "theta": {
+      "min": 290.89415548887973,
+      "max": 1949.256378220724,
+      "dtype": "float64",
+      "shape": [
+        13,
+        28080,
+        60
+      ],
+      "values_sha256": "79062265e144e5d58036669142519996b4fd2110ed66d0e54483006a7f39e0de"
+    },
+    "j_jNO2": {
+      "min": 0.0,
+      "max": 0.01726729831627479,
+      "dtype": "float64",
+      "shape": [
+        13,
+        28080,
+        60
+      ],
+      "values_sha256": "d12f22d725d595b1a8d243c59d0dc2c928e70348540ad311264cc3d5a85a4040"
+    },
+    "areaCell": {
+      "min": 251468.1172470369,
+      "max": 251468.1172470369,
+      "dtype": "float64",
+      "shape": [
+        28080
+      ],
+      "values_sha256": "2a0a14b183193557d576e59f95976129863cf85d2ecd0e68f9ccce26dda7e05c"
+    },
+    "indexToCellID": {
+      "min": 1.0,
+      "max": 28080.0,
+      "dtype": "int32",
+      "shape": [
+        28080
+      ],
+      "values_sha256": "ad0a1f23ecc20e98aac091eb8491bf555de2a8fadf8e485b6ec9a7e6936edf7f"
+    },
+    "zz": {
+      "min": 1.0,
+      "max": 1.0,
+      "dtype": "float64",
+      "shape": [
+        28080,
+        60
+      ],
+      "values_sha256": "eaf0d0bb0c045e58494f9015b1dc3116adca4bbdb04de730203786c932f3d6fd"
+    },
+    "rho_zz": {
+      "min": 0.0009687478999884555,
+      "max": 1.1617283089230432,
+      "dtype": "float64",
+      "shape": [
+        13,
+        28080,
+        60
+      ],
+      "values_sha256": "c1f45fe9f0f483948108bb337472bc35f252d4d8706abfc2d49612f5de8d10a1"
+    },
+    "rainnc": {
+      "min": 0.0,
+      "max": 70.0077832893915,
+      "dtype": "float64",
+      "shape": [
+        13,
+        28080
+      ],
+      "values_sha256": "3cee18f78ab64fb7fcc6b323d29789f481d5ef595884006393cd303409406c7c"
+    }
+  },
+  "records": [
+    {
+      "xtime": "0000-01-01_18:00:00",
+      "dry_air_mass_kg": 71630682665104.75,
+      "w_max_m_s": 0.0,
+      "w_min_m_s": 0.0,
+      "lightning_gate_cell_levels_at_output": 0,
+      "species": {
+        "qNO": {
+          "mass_kg": 0.0,
+          "min_kg_kg": 0.0,
+          "max_kg_kg": 0.0,
+          "max_ppbv": 0.0
+        },
+        "qNO2": {
+          "mass_kg": 0.0,
+          "min_kg_kg": 0.0,
+          "max_kg_kg": 0.0,
+          "max_ppbv": 0.0
+        },
+        "qO3": {
+          "mass_kg": 5928056.496422463,
+          "min_kg_kg": 8.275862068965518e-08,
+          "max_kg_kg": 8.275862068965518e-08,
+          "max_ppbv": 49.93862068965518
+        }
+      },
+      "NOx_mol": 0.0,
+      "Ox_mol": 123501177.00880131
+    },
+    {
+      "xtime": "0000-01-01_18:10:00",
+      "dry_air_mass_kg": 71630682665104.77,
+      "w_max_m_s": 6.396351612568706,
+      "w_min_m_s": -1.659045614920311,
+      "lightning_gate_cell_levels_at_output": 0,
+      "species": {
+        "qNO": {
+          "mass_kg": 0.0,
+          "min_kg_kg": 0.0,
+          "max_kg_kg": 0.0,
+          "max_ppbv": 0.0
+        },
+        "qNO2": {
+          "mass_kg": 0.0,
+          "min_kg_kg": 0.0,
+          "max_kg_kg": 0.0,
+          "max_ppbv": 0.0
+        },
+        "qO3": {
+          "mass_kg": 5928056.496422462,
+          "min_kg_kg": 8.275862068965459e-08,
+          "max_kg_kg": 8.275862068965573e-08,
+          "max_ppbv": 49.93862068965551
+        }
+      },
+      "NOx_mol": 0.0,
+      "Ox_mol": 123501177.0088013
+    },
+    {
+      "xtime": "0000-01-01_18:20:00",
+      "dry_air_mass_kg": 71630682665104.75,
+      "w_max_m_s": 28.10246108665575,
+      "w_min_m_s": -11.141109960286647,
+      "lightning_gate_cell_levels_at_output": 1650,
+      "species": {
+        "qNO": {
+          "mass_kg": 8658.80309406262,
+          "min_kg_kg": 0.0,
+          "max_kg_kg": 1.401104960363772e-07,
+          "max_ppbv": 135.2738817132015
+        },
+        "qNO2": {
+          "mass_kg": 2218.2550742294434,
+          "min_kg_kg": 0.0,
+          "max_kg_kg": 3.258502941018919e-08,
+          "max_ppbv": 20.51751795322791
+        },
+        "qO3": {
+          "mass_kg": 5925741.795475441,
+          "min_kg_kg": 4.8756850870315093e-08,
+          "max_kg_kg": 8.27586206896562e-08,
+          "max_ppbv": 49.93862068965579
+        }
+      },
+      "NOx_mol": 336849.7061983796,
+      "Ox_mol": 123501177.00880131
+    },
+    {
+      "xtime": "0000-01-01_18:30:00",
+      "dry_air_mass_kg": 71630682665104.75,
+      "w_max_m_s": 38.80103898112677,
+      "w_min_m_s": -10.201521541447063,
+      "lightning_gate_cell_levels_at_output": 2113,
+      "species": {
+        "qNO": {
+          "mass_kg": 60654.12300098433,
+          "min_kg_kg": 3.0214965249694155e-296,
+          "max_kg_kg": 2.9237134278888066e-07,
+          "max_ppbv": 282.2786840358085
+        },
+        "qNO2": {
+          "mass_kg": 12833.203289766498,
+          "min_kg_kg": 4.810249327746164e-299,
+          "max_kg_kg": 4.301415018711872e-08,
+          "max_ppbv": 27.084327210430033
+        },
+        "qO3": {
+          "mass_kg": 5914665.327772271,
+          "min_kg_kg": 3.787429005961569e-08,
+          "max_kg_kg": 8.275862068965588e-08,
+          "max_ppbv": 49.9386206896556
+        }
+      },
+      "NOx_mol": 2300786.780245126,
+      "Ox_mol": 123501177.0088013
+    },
+    {
+      "xtime": "0000-01-01_18:40:00",
+      "dry_air_mass_kg": 71630682665104.75,
+      "w_max_m_s": 42.85655225893234,
+      "w_min_m_s": -16.07533498539632,
+      "lightning_gate_cell_levels_at_output": 2833,
+      "species": {
+        "qNO": {
+          "mass_kg": 146152.13208266714,
+          "min_kg_kg": 2.831020062614062e-236,
+          "max_kg_kg": 2.942513664426305e-07,
+          "max_ppbv": 284.09380927303096
+        },
+        "qNO2": {
+          "mass_kg": 26429.206284040578,
+          "min_kg_kg": 4.523455244124059e-239,
+          "max_kg_kg": 4.1243352288243215e-08,
+          "max_ppbv": 25.969325065599822
+        },
+        "qO3": {
+          "mass_kg": 5900478.19421303,
+          "min_kg_kg": 3.972207917147856e-08,
+          "max_kg_kg": 8.275862068965626e-08,
+          "max_ppbv": 49.93862068965583
+        }
+      },
+      "NOx_mol": 5446285.698785439,
+      "Ox_mol": 123501177.00880133
+    },
+    {
+      "xtime": "0000-01-01_18:50:00",
+      "dry_air_mass_kg": 71630682665104.77,
+      "w_max_m_s": 46.73333299374934,
+      "w_min_m_s": -19.605058442504827,
+      "lightning_gate_cell_levels_at_output": 2751,
+      "species": {
+        "qNO": {
+          "mass_kg": 253508.18241041852,
+          "min_kg_kg": 7.992028695112703e-196,
+          "max_kg_kg": 3.3472912690346036e-07,
+          "max_ppbv": 323.17427744275295
+        },
+        "qNO2": {
+          "mass_kg": 44788.06714008187,
+          "min_kg_kg": 8.126488650689494e-199,
+          "max_kg_kg": 6.371891975244213e-08,
+          "max_ppbv": 40.121310419079016
+        },
+        "qO3": {
+          "mass_kg": 5881321.12201542,
+          "min_kg_kg": 1.626931312189081e-08,
+          "max_kg_kg": 8.275862068965738e-08,
+          "max_ppbv": 49.93862068965651
+        }
+      },
+      "NOx_mol": 9423926.380493991,
+      "Ox_mol": 123501177.0088013
+    },
+    {
+      "xtime": "0000-01-01_19:00:00",
+      "dry_air_mass_kg": 71630682665104.75,
+      "w_max_m_s": 41.45966865026941,
+      "w_min_m_s": -15.843780918552401,
+      "lightning_gate_cell_levels_at_output": 2876,
+      "species": {
+        "qNO": {
+          "mass_kg": 349922.7873035341,
+          "min_kg_kg": 2.5541045873245566e-161,
+          "max_kg_kg": 2.883960664468119e-07,
+          "max_ppbv": 278.44063423306795
+        },
+        "qNO2": {
+          "mass_kg": 61938.87901644039,
+          "min_kg_kg": 3.664224370631532e-164,
+          "max_kg_kg": 6.469046079520977e-08,
+          "max_ppbv": 40.73305179688639
+        },
+        "qO3": {
+          "mass_kg": 5863424.622666176,
+          "min_kg_kg": 1.5255531164173154e-08,
+          "max_kg_kg": 8.275862068965931e-08,
+          "max_ppbv": 49.938620689657675
+        }
+      },
+      "NOx_mol": 13010590.28004042,
+      "Ox_mol": 123501177.0088013
+    },
+    {
+      "xtime": "0000-01-01_19:10:00",
+      "dry_air_mass_kg": 71630682665104.75,
+      "w_max_m_s": 42.56950589173808,
+      "w_min_m_s": -14.536237125346396,
+      "lightning_gate_cell_levels_at_output": 2396,
+      "species": {
+        "qNO": {
+          "mass_kg": 435297.91106823797,
+          "min_kg_kg": 9.58333251331379e-137,
+          "max_kg_kg": 2.631414927628091e-07,
+          "max_ppbv": 254.05784843263697
+        },
+        "qNO2": {
+          "mass_kg": 78737.27060603251,
+          "min_kg_kg": 1.1996157554465398e-139,
+          "max_kg_kg": 4.6337124330489915e-08,
+          "max_ppbv": 29.176673999087875
+        },
+        "qO3": {
+          "mass_kg": 5845895.866224863,
+          "min_kg_kg": 3.440683877955802e-08,
+          "max_kg_kg": 8.275862068966048e-08,
+          "max_ppbv": 49.93862068965838
+        }
+      },
+      "NOx_mol": 16221610.164724581,
+      "Ox_mol": 123501177.00880128
+    },
+    {
+      "xtime": "0000-01-01_19:20:00",
+      "dry_air_mass_kg": 71630682665104.75,
+      "w_max_m_s": 41.82440518633869,
+      "w_min_m_s": -22.233422136935058,
+      "lightning_gate_cell_levels_at_output": 2364,
+      "species": {
+        "qNO": {
+          "mass_kg": 514316.83410129196,
+          "min_kg_kg": 1.0793669299684156e-111,
+          "max_kg_kg": 2.9434836017929985e-07,
+          "max_ppbv": 284.18745478591046
+        },
+        "qNO2": {
+          "mass_kg": 94883.64725310115,
+          "min_kg_kg": 9.108567646004705e-115,
+          "max_kg_kg": 4.895004178317394e-08,
+          "max_ppbv": 30.821925874447025
+        },
+        "qO3": {
+          "mass_kg": 5829047.4732018355,
+          "min_kg_kg": 3.1680316220237174e-08,
+          "max_kg_kg": 8.275862068966245e-08,
+          "max_ppbv": 49.938620689659565
+        }
+      },
+      "NOx_mol": 19206582.453806136,
+      "Ox_mol": 123501177.00880131
+    },
+    {
+      "xtime": "0000-01-01_19:30:00",
+      "dry_air_mass_kg": 71630682665104.75,
+      "w_max_m_s": 37.46658091363734,
+      "w_min_m_s": -19.453637375959897,
+      "lightning_gate_cell_levels_at_output": 1768,
+      "species": {
+        "qNO": {
+          "mass_kg": 565861.1196465339,
+          "min_kg_kg": 2.2845714972254303e-95,
+          "max_kg_kg": 3.0773689034384797e-07,
+          "max_ppbv": 297.1138128891784
+        },
+        "qNO2": {
+          "mass_kg": 110260.0232002908,
+          "min_kg_kg": 2.165881616731752e-98,
+          "max_kg_kg": 7.030766679578956e-08,
+          "max_ppbv": 44.269986611738425
+        },
+        "qO3": {
+          "mass_kg": 5813002.559169985,
+          "min_kg_kg": 9.394098815754123e-09,
+          "max_kg_kg": 8.275862068966486e-08,
+          "max_ppbv": 49.938620689661015
+        }
+      },
+      "NOx_mol": 21258994.347644407,
+      "Ox_mol": 123501177.0088013
+    },
+    {
+      "xtime": "0000-01-01_19:40:00",
+      "dry_air_mass_kg": 71630682665104.75,
+      "w_max_m_s": 33.28413807140916,
+      "w_min_m_s": -10.115665582353532,
+      "lightning_gate_cell_levels_at_output": 956,
+      "species": {
+        "qNO": {
+          "mass_kg": 592069.0186419884,
+          "min_kg_kg": 5.989369699975185e-86,
+          "max_kg_kg": 2.6279795380441044e-07,
+          "max_ppbv": 253.72616843908224
+        },
+        "qNO2": {
+          "mass_kg": 119449.82043848159,
+          "min_kg_kg": 5.43568427212181e-89,
+          "max_kg_kg": 6.231544340716243e-08,
+          "max_ppbv": 39.23759628309599
+        },
+        "qO3": {
+          "mass_kg": 5803413.205530133,
+          "min_kg_kg": 1.773381017773796e-08,
+          "max_kg_kg": 8.27586206896673e-08,
+          "max_ppbv": 49.9386206896625
+        }
+      },
+      "NOx_mol": 22332369.18165646,
+      "Ox_mol": 123501177.00880128
+    },
+    {
+      "xtime": "0000-01-01_19:50:00",
+      "dry_air_mass_kg": 71630682665104.75,
+      "w_max_m_s": 35.53237927643601,
+      "w_min_m_s": -10.851978169683626,
+      "lightning_gate_cell_levels_at_output": 3096,
+      "species": {
+        "qNO": {
+          "mass_kg": 621649.6083600323,
+          "min_kg_kg": 5.132034875666922e-75,
+          "max_kg_kg": 2.607371001317971e-07,
+          "max_ppbv": 251.7364554352475
+        },
+        "qNO2": {
+          "mass_kg": 127829.56064715316,
+          "min_kg_kg": 5.5494053902216965e-78,
+          "max_kg_kg": 5.3255449243723874e-08,
+          "max_ppbv": 33.53287247988948
+        },
+        "qO3": {
+          "mass_kg": 5794669.12879065,
+          "min_kg_kg": 2.7187717130960814e-08,
+          "max_kg_kg": 8.275862068966938e-08,
+          "max_ppbv": 49.93862068966375
+        }
+      },
+      "NOx_mol": 23500557.104330495,
+      "Ox_mol": 123501177.00880128
+    },
+    {
+      "xtime": "0000-01-01_20:00:00",
+      "dry_air_mass_kg": 71630682665104.75,
+      "w_max_m_s": 28.283322125718986,
+      "w_min_m_s": -14.836265820483828,
+      "lightning_gate_cell_levels_at_output": 3564,
+      "species": {
+        "qNO": {
+          "mass_kg": 688914.7026559504,
+          "min_kg_kg": 6.92635359479118e-70,
+          "max_kg_kg": 2.5960705386278033e-07,
+          "max_ppbv": 250.64541836343722
+        },
+        "qNO2": {
+          "mass_kg": 147793.07816349057,
+          "min_kg_kg": 4.3036966508498693e-73,
+          "max_kg_kg": 4.8433324204543486e-08,
+          "max_ppbv": 30.496569034566942
+        },
+        "qO3": {
+          "mass_kg": 5773837.632251862,
+          "min_kg_kg": 3.221949978055868e-08,
+          "max_kg_kg": 8.275862068967132e-08,
+          "max_ppbv": 49.938620689664916
+        }
+      },
+      "NOx_mol": 26176716.42541916,
+      "Ox_mol": 123501177.00880128
+    }
+  ],
+  "times": [
+    "0000-01-01_18:00:00",
+    "0000-01-01_18:10:00",
+    "0000-01-01_18:20:00",
+    "0000-01-01_18:30:00",
+    "0000-01-01_18:40:00",
+    "0000-01-01_18:50:00",
+    "0000-01-01_19:00:00",
+    "0000-01-01_19:10:00",
+    "0000-01-01_19:20:00",
+    "0000-01-01_19:30:00",
+    "0000-01-01_19:40:00",
+    "0000-01-01_19:50:00",
+    "0000-01-01_20:00:00"
+  ],
+  "n_cells": 28080,
+  "n_levels": 60,
+  "max_rho_vs_zz_rho_zz_relative_difference": 0.0,
+  "dry_air_mass_kg_max_relative_drift": 2.1813278079523034e-16,
+  "Ox_mol_max_relative_drift": 2.4131205150839533e-16,
+  "inventory_notes": "Inventories use areaCell * layer thickness * dry rho. NOx = NO + NO2 in moles includes lightning production; Ox = O3 + NO2 in moles is invariant for these two chemical reactions and the NO-only source. Reported drifts characterize this coupled baseline; no isolated PBL/convection budget is claimed. Lightning activation is sampled at output times, not integrated over all steps. Optimized MPAS writes a regular log only for rank 0; all rank error/abort files and the MPI exit status are checked.",
+  "status": "pass",
+  "qualification": "coupled regression baseline"
+}

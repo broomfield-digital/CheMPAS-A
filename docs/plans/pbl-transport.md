@@ -192,11 +192,52 @@ refresh time, and applied `dt` to selectable diagnostics/NetCDF or a compact
 budget stream. Check the realized state increment as well as the computed
 tendency so omitted or duplicate application is visible.
 
-The prepared local baseline is `/Users/dfillmor/Data/CheMPAS`, with results in
-`TEST-RESULTS.txt` and `summary.json`. Its idealized cases have PBL disabled;
-they are regression tests, not evidence of PBL transport. Reuse their input and
-NetCDF validation infrastructure, add deterministic active-PBL fixtures, and
-track portable recipes rather than making that absolute path a requirement.
+The resolved supercell LNOx case is the initial regression baseline, with PBL
+and parameterized convection explicitly off. Use
+`testing/chemistry_transport/prepare_supercell_baseline.py` to stage fresh inputs
+and pinned TUV-x data. The full case runs for two simulated hours with a 3-second
+timestep on eight MPI ranks, starting at `0000-01-01_18:00:00`; output is saved
+every ten minutes. Initialize NO and NO2 to zero and O3 to 50 ppbv with
+`scripts/init_lnox_o3.py` (nominal 50 ppbv using that initializer's 0.029 kg/mol
+air convention, or `8.275862068965518e-8 kg/kg`). Reported ppbv diagnostics use
+the host's 0.0289644 kg/mol air constant. This establishes existing resolved
+transport and reactive chemistry behavior; active-PBL qualification still needs
+separate fixtures.
+
+The GNU baseline on 2026-11-07 at `2c6ff111` passed all 2,400 steps and 13 output
+records with zero model errors. Maximum relative dry-air mass and Ox inventory
+drifts were `2.181e-16` and `2.413e-16`, respectively. The 60-second developer
+smoke also passed; the 600-second option is available but was not run in this
+session. See the recorded [manifest](../../testing/chemistry_transport/results/supercell-lnox-gnu-20261107/manifest.json)
+and [summary](../../testing/chemistry_transport/results/supercell-lnox-gnu-20261107/summary.json).
+The manifest records existing startup warnings and the local run-data location;
+large NetCDF outputs remain outside the repository. A final restart was written,
+but restart/continuous equivalence has not been tested.
+
+For development, reuse the frozen baseline inputs with a fresh executable:
+
+```bash
+bash testing/chemistry_transport/run_supercell_smoke.sh BASELINE_DIR NEW_RUN_DIR 60
+# Optional longer smoke test, using a different new run directory:
+bash testing/chemistry_transport/run_supercell_smoke.sh BASELINE_DIR NEW_RUN_DIR 600
+```
+
+The runner defaults to 60 simulated seconds, copies the current checkout's
+`atmosphere_model` (or an explicit fourth argument), and refuses to overwrite
+an existing run directory. It records the executable/input hashes, source
+revision and model-source diff, MPI exit status, timing, and a checked JSON
+summary. It uses the dependency environment recorded with the baseline.
+Optionally set `CHEMPAS_SMOKE_REFERENCE` to a saved summary for the same duration
+and toolchain to require exact agreement of every reference output field.
+
+`check_supercell_baseline.py` checks the exact duration and step/output counts,
+all numeric fields at every saved time, positivity of the chemical species,
+photolysis activity, dry-density consistency, and rank error/abort files. It
+records per-variable value hashes and dry-air/chemical inventories. The full
+baseline also requires lightning activation and nonzero final NO and NO2.
+Smoke tests do not require lightning production before storm spin-up and do
+not qualify PBL transport. Chemical inventory drift is reported separately
+from the isolated transport-budget thresholds above.
 
 Complete #40 only after the supported subset is explicitly listed, all required
 tests for that subset pass on both toolchains, remaining configurations fail
