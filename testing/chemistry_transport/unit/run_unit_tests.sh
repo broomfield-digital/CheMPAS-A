@@ -44,11 +44,14 @@ sources=(
     "$core/chemistry/musica/mpas_chem_transport_map.F"
     "$core/physics/mpas_atmphys_utilities.F"
     "$core/physics/mpas_atmphys_tracer_column.F"
+    "$core/physics/mpas_atmphys_pbl_diffusion.F"
     "$core/physics/mpas_atmphys_pbl_gas.F"
     "$core/physics/mpas_atmphys_cu_gas.F"
     "$core/physics/mpas_atmphys_tracer_transport.F"
 )
 support=("$here/unit_assert.F90")
+# Reference column fixtures (columns/make_diffusion_fixtures.py).
+export CHEMPAS_UNIT_COLUMNS=${CHEMPAS_UNIT_COLUMNS:-$here/../columns}
 
 if (( $# > 0 )); then
     tests=("$@")
