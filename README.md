@@ -88,7 +88,52 @@ The resulting archive remains `src/core_atmosphere/chemistry/libchem.a`.
 Implementation plans for gas-phase physics are tracked on the feature branches:
 [PBL transport](https://github.com/NCAR/CheMPAS-A/blob/chempas-a-pbl/docs/plans/pbl-transport.md)
 and [convective transport](https://github.com/NCAR/CheMPAS-A/blob/chempas-a-convect/docs/plans/convective-transport.md).
-These plans describe pending work and qualification requirements.
+These plans describe pending work and qualification requirements. On
+`chempas-a-pbl`, `config_micm_pbl_transport = true` mixes MICM gases with the
+YSU scheme's scalar exchange coefficient at the default PBL interval
+(`config_pbl_interval = 'none'`); MYNN and nondefault intervals are rejected
+at initialization.
+
+## Sharing plots
+
+`scripts/plot_drive.py` publishes PNG, PDF, and SVG files from
+`~/Data/CheMPAS-A/plot-outbox` using [rclone](https://rclone.org/). Connect a Mac
+folder with SMB File Sharing enabled, using the share name and Mac login account:
+
+```bash
+python3 scripts/plot_drive.py connect-smb MyMac.local CheMPAS-A-Plots --user MAC_USER --gui
+python3 scripts/plot_drive.py status
+python3 scripts/plot_drive.py upload --dry-run
+python3 scripts/plot_drive.py upload
+```
+
+The connection becomes the default destination after successful sign-in. Mac
+hostnames are resolved through the OS and saved as LAN IP addresses. If the
+folder is inside the account's home share, the helper uses that path. The
+SMB password is entered in a local dialog (`--gui`) or a masked terminal prompt,
+then saved in the desktop login keyring through `scripts/plot_keyring.py`.
+On Linux this requires `/usr/bin/python3` with the `Secret` GI bindings and a
+persistent, password-protected login keyring. Uploads require that keyring to be
+unlocked. The SMB password is supplied to rclone only for the lifetime of each
+upload; it is not saved in `rclone.conf`, shell commands, or repository files.
+
+SMB uploads copy the plot outbox in full and read the destination files back to
+verify their contents, since SMB does not supply file hashes. Other destination
+files are preserved. The Mac must be reachable on the LAN during an upload.
+
+Google Drive is also supported: create an OAuth **Desktop app** client following
+[rclone's setup instructions](https://rclone.org/drive/#making-your-own-client-id),
+download its JSON outside this repository, and run
+`python3 scripts/plot_drive.py connect /path/to/downloaded-client.json`.
+This selects `chempas-plots:CheMPAS-A/plots` as the default destination, using
+`drive.file` access for files/folders created through the connection. Google
+credentials remain in the user's private rclone configuration; they do not use
+the SMB keyring helper. Drive uploads copy changed plots and verify their hashes.
+
+An optional `chempas-plots` symlink to this script makes these commands available
+outside the checkout.
+`--source` and `--destination` can override the default folders. Uploads run when
+requested; no background synchronization is installed.
 
 ## MPAS
 
