@@ -1,8 +1,10 @@
 # Implementation plan: PBL transport of MICM tracers
 
-Status: the P1 shared foundation (`0e2f15f6`) and P2, the column diffusion
-kernel and tendency proof (`7ae5f39d` shared, `0eb2c8ad`), are implemented. Scheme
-transport and qualification (P3–P6) are pending.
+Status: the P1 shared foundation (`0e2f15f6`), P2, the column diffusion kernel
+and tendency proof (`7ae5f39d` shared, `0eb2c8ad`), and P3, YSU gas transport at
+the default PBL interval (see [P3](#p3-ysu-gas-pbl-transport-implemented)), are
+implemented. MYNN, intervals/restart and toolchain qualification (P4–P6) are
+pending.
 
 - Tracking issue: [CheMPAS-A #40](https://github.com/NCAR/CheMPAS-A/issues/40).
 - Branch: `chempas-a-pbl`, from `chempas-a` at
@@ -138,8 +140,10 @@ deterministic application, and retained license notices. An edited ignored
   fixtures; prove `rho_zz` conversion and tendency consumption for each supported
   advection mode before connecting active mixing. Commits `7ae5f39d` (shared) and
   `0eb2c8ad`; see [P2](#p2-column-diffusion-kernel-and-tendency-proof-implemented).
-- [ ] P3: YSU runtime interface/operator exports, generic tendency assembly,
+- [x] P3: YSU runtime interface/operator exports, generic tendency assembly,
   default-interval integration, and stable/unstable/top-down qualification.
+  Commits `85f68008` (MMM-physics export patch) and `c1bd210a`; see
+  [P3](#p3-ysu-gas-pbl-transport-implemented).
 - [ ] P4: MYNN local diffusion, then updraft EDMF, then downdraft EDMF in separate
   commits. Keep unqualified combinations rejected at initialization.
 - [ ] P5: nondefault interval contract, cache restart behavior, MPI/halo checks,
@@ -407,6 +411,226 @@ Deferred:
 - Halo and MPI coverage with horizontally varying sources (P5).
 - P1's remaining minor items: budget naming, accessor range checks, and
   `chemistry_init` aliasing.
+
+## P3 YSU gas PBL transport (implemented)
+
+P3 connects YSU to the P2 kernel. `config_micm_pbl_transport = .true.` mixes every
+independently transported MICM gas with YSU's scalar exchange at the default
+PBL interval. It has two commits on `chempas-a-pbl`:
+
+- `85f68008`, the MMM-physics export patch and its application;
+- `c1bd210a`, the YSU gas transport, with its unit tests and in-model
+  qualification.
+
+### Operator
+
+YSU mixes its moisture tracers (`qmix`) with the water-vapor matrix. That matrix
+is built from `xkzq`, YSU's scalar exchange coefficient after its
+entrainment-zone adjustment, which sits on the interface between layers k and
+k+1. MPAS's `exch_h` is a different quantity, the heat coefficient `xkzh`, and
+YSU stores it on the bottom face of layer k+1. MMM-physics does not export
+`xkzq`, so P3 carries a temporary patch that does, as this plan allows:
+
+- `physics/patches/mmm-physics/bl_ysu-export-xkzq.patch` adds an optional
+  `xkzqx` output to `bl_ysu_run`. It is set just before the tracer solve, with
+  `xkzqx(kte) = 0`. The file keeps its BSD-3 notice.
+- `physics/apply_mmm_patches.sh` applies the patch from the physics Makefile.
+  It applies only to the pristine file of the pinned tag (`20250616-MPASv8.3`,
+  `a4baf7f3`) or leaves an already patched file alone, both identified by
+  SHA-256 in `MANIFEST`. It refuses any other contents.
+- `checkout_externals` skips every external, with only a warning, while any
+  external has local changes. Leaving the patch in place would therefore hold
+  MMM-physics and UGWP at their old revisions after an `Externals.cfg` update.
+  The Makefile runs `apply_mmm_patches.sh --revert` before `checkout_externals`
+  and applies the patch again afterwards. An unchanged external keeps the
+  patched file's modification time, so it is not recompiled. An updated
+  external is checked out and then stops the build until the patch is
+  refreshed. `test_apply_mmm_patches.sh` covers all of these cases (13 checks).
+- The MMM-physics BSD-3 text is beside the patch, since the patch contains
+  portions of that source.
+
+The MPAS YSU wrapper (`physics_wrf/module_bl_ysu.F`) passes `xkzqx` out as the
+optional `exch_q`, on the same k/k+1 interface. The PBL driver allocates the
+array it passes only when transport is enabled; an unallocated allocatable
+array is an absent argument (Fortran 2008).
+
+After YSU, the driver stores the interface exchange for each owned column
+(`pbl_gas_cache_store_moist_column`, then `pbl_gas_exchange`):
+`G(k+1) = 0.5*(m_d(k)+m_d(k+1))*xkzq(k)/dzc**2`, with
+`dzc = 0.5*(dz(k)+dz(k+1))` and `m_d = rho_p/(1+qv)*dz = zz*rho_zz*dz`. This is
+the dry-air form of YSU's `dsig/(g*dza)*xkzq/dza`. A negative or non-finite K,
+or a nonpositive mass, stops the model. Later in the same step, transport
+assembly applies P2's closed-column backward-Euler solve, with the model `dt`,
+to the post-chemistry gases.
+
+Only the operator is held, never an increment. With `config_pbl_interval =
+'none'` every step refreshes it before it is used, so there are no restart
+fields (P5).
+
+YSU's `qmix` tracer solve has no nonlocal or entrainment source term; those
+appear only in the heat and moisture equations. Entrainment reaches tracers
+through `xkzq`, and so does top-down mixing (`config_ysu_pblmix`).
+
+### Column reference tests
+
+`unit/test_ysu_gas_operator.F90` (28 checks) calls `bl_ysu_run` itself on
+stable, convective and cloud-topped columns, with top-down mixing off and on:
+
+- Exactness of the export. Rebuilt with YSU's moist pressure weights and
+  `dt2 = 2*dt`, the export reproduces YSU's own tracer tendency `qmixtnp` to
+  ≤ 1e-10. `xkzq` at the k/k+1 interface is the operator YSU applies.
+- The CheMPAS-A operator conserves dry mass to roundoff. It converges to YSU's
+  as dt → 0: at `dt = 1e-3` s they differ by ≤ 9.3e-4, the moist versus dry
+  weighting, of order qv.
+- At the model step the two differ by design. Per mode, YSU's tracer update is
+  `(1+λ)/(1+2λ)`, so it never removes more than half of a mode in one step.
+  Backward Euler gives `1/(1+λ)`. Against a near-exact solution from 1,000
+  substeps, the CheMPAS-A step is closer in every column:
+
+  | Column | CheMPAS-A step error | YSU step error |
+  | --- | --- | --- |
+  | Convective | 0.33 | 0.76 |
+  | Cloud-topped, top-down mixing on | 0.28 | 0.65 |
+  | Stable | 4.7e-3 | 1.4e-2 |
+
+  So the gas step does not reproduce YSU's moisture step: the operator matches,
+  the time discretization deliberately does not.
+- In the cloud-topped column, top-down mixing raises the export's maximum K
+  from 50 to 110 m² s⁻¹. That branch needs the cloud to reach the PBL top and
+  radiative cooling below `kpbl`.
+
+The rest of the chain from YSU to the kernel is unit-tested:
+
+- `unit/test_ysu_wrapper_export.F90` (9 checks) runs the MPAS wrapper with the
+  driver's `(ims:ime, kms:kme, jms:jme)` arrays. `exch_q(k)` must equal
+  `bl_ysu_run`'s `xkzqx(k)` bitwise, and level `kme` must not be written. With
+  `exch_q` absent, or given an unallocated array, every other output must be
+  bitwise unchanged. Shifting the copy-out up one level fails three of these
+  checks.
+- `unit/test_pbl_gas_exchange.F90` (9 checks) covers the construction and input
+  validation of G.
+- `unit/test_pbl_gas.F90` (19 checks) covers:
+  - the gate table;
+  - the operator cache and its mask;
+  - the dry layer mass from moist density;
+  - `apply`, which is bitwise the kernel with the cached G.
+
+### Gate
+
+`pbl_gas_init` runs once, after `chemistry_init`.
+
+| Configuration with `config_micm_pbl_transport = .true.` | Result |
+| --- | --- |
+| No transported MICM gas | logged no-op |
+| `config_pbl_scheme = 'off'` | supported zero transport, logged |
+| `bl_ysu` with `sf_monin_obukhov`/`sf_monin_obukhov_rev`, `config_pbl_interval = 'none'`, `config_ysu_pblmix` either | enabled |
+| `bl_mynn` | stops: not qualified until P4 |
+| a nondefault `config_pbl_interval` | stops: until P5 |
+| another scheme, or a surface layer of `off` | stops (MPAS's `physics_namelist_check` already rejects YSU without a surface layer) |
+
+### In-model qualification
+
+These runs are evidence that the operator is integrated correctly and conserves
+mass. They are not a physical qualification of YSU gas mixing; that rests on the
+column tests above. The supercell grid has 60 stretched levels up to 50 km, with
+interfaces at 0, 299, 712, 1182 and 1694 m, so its PBL spans only one or two
+layers. A finer-grid fixture belongs before P6.
+
+`check_pbl_ysu.sh BASELINE_DIR RUN_ROOT [MODEL [PRE_P3_MODEL]]` runs the
+supercell with YSU and the Monin-Obukhov surface layer. Each run is 300 s on
+eight ranks, with output every 60 s. The mechanism is inert (`A = 0`, `j = 0`,
+TUV-x off) and lightning is off.
+
+The baseline initial gases are vertically uniform, and mixing cannot change a
+uniform profile. `make_pbl_init.py` therefore keeps the supercell meteorology
+and sets horizontally uniform profiles:
+
+- NO confined near the surface;
+- NO2 1e-9 kg/kg below 1 km. The step falls at the 1182 m interface, above
+  both PBL tops, so YSU's free-atmosphere coefficient mixes it in both
+  regimes;
+- O3 depleted toward the surface.
+
+The stable case uses the baseline surface (288 K, about 11 K colder than the
+lowest layer). The convective case sets `skintemp = sst = 305` K. Each case is
+run with and without gas transport. `check_pbl_ysu.py` checks:
+
+- the non-gas fields are bitwise identical with and without transport;
+- `hpbl > 0` in every column;
+- each gas stays finite and no lower than
+  `-(1e-20 + 1e-12*max_column(q0))` at every record;
+- each gas's domain mass is conserved (≤ 1e-13 relative);
+- every gradient gas is mixed down-gradient: the domain total of its dry-mass
+  column variance is lower with transport than without.
+
+Results (GNU, eight ranks, 300 s), on final-record data:
+
+| Case | hpbl min / median (m) | hfx median (W m⁻²) | Column variance mixed out: NO / NO2 / O3 | Columns reduced (NO2) | Max gas mass drift |
+| --- | --- | --- | --- | --- | --- |
+| Stable | 150 / 716 | −56 | 4.9e-4 / 4.5e-5 / 2.9e-5 | 28,047 of 28,080 | 4.1e-16 |
+| Convective | 487 / 561 | +76 | 1.2e-1 / 3.8e-5 / 1.6e-3 | 28,046 | 1.9e-16 |
+| Convective, top-down on | 487 / 561 | +76 | 1.2e-1 / 3.8e-5 / 1.6e-3 | 28,046 | 3.8e-16 |
+
+Every check passes, and in every pair the non-gas fields are bitwise identical.
+In the convective case the domain-median lowest-layer NO falls 11% and O3 rises
+1.8%, against 0.04% and 0.006% in the stable case. Convection mixes NO 250 times
+and O3 55 times more strongly than the stable case does. NO2's step lies above
+both PBL tops, so it mixes about equally in both regimes (3.8e-5 against
+4.5e-5) and is left out of that comparison. Every column reduced its NO and O3
+variance.
+
+The operator lowers every column's variance at every step, but resolved
+transport moves the difference it made between columns. Near the warm bubble a
+few columns therefore gain variance: in the stable case, 33 of 28,080 for NO2,
+in a ring 5–7 km from the bubble centre, plus one far-field column at
+−3.5e-7. In each of them the transport difference is almost entirely one-signed
+(`sum(m*d)/sum(m*|d|)` ≥ 0.9955), so the column gained gas, which is horizontal
+inflow, rather than being redistributed in place. The required check is
+therefore the domain total; the per-column counts are reported, and the column
+tests check the operator column by column.
+
+YSU's PBL is not deeper in the convective case. Its stable height uses a
+critical bulk Richardson number of 0.25 with the supercell's low-level shear;
+the unstable height uses 0 with a thermal excess. The convective case does mix
+more strongly, and the check uses that.
+
+With `config_ysu_pblmix` set, YSU also raises the PBL height using the
+liquid-ice potential temperature. That changes the meteorology slightly, but
+the gas metrics agree with the plain convective case to the digits shown. The
+radiatively driven cloud-top branch needs cooling, and the supercell has no
+radiation, so only the column tests exercise that branch.
+
+Gate cases: transport requested with MYNN or with a nondefault interval stops
+the model with the gate's message. YSU without a surface layer stops in
+`physics_namelist_check`. PBL off runs and logs the transport as not enabled.
+
+Transport off, with YSU on, is bitwise identical to the pre-P3 executable in
+every output field. The PBL-off 60-s and 600-s smoke runs match the P1
+references exactly (`run_supercell_smoke.sh` with `CHEMPAS_SMOKE_REFERENCE`).
+The P1 wiring check passes. The final runs were at `c1bd210a`, with GNU on eight
+ranks. They are kept outside the repository, under
+`~/Data/CheMPAS-A/p3-dev/`: `pbl-ysu-final`, `smoke-60s-final`,
+`smoke-600s-final` and `wiring-final`. The pre-P3 executable for comparison is
+`pre-p3-atmosphere_model` (revision `50f2666c`).
+
+### Deferred
+
+- The MMM-physics export upstream, in a versioned release, to replace the
+  patch. Opening that request is an outward-facing step for the maintainers.
+- `exch_q(k)` is on the k/k+1 interface, while YSU's `exch_h(k+1)` is on the
+  same interface by the bottom-face convention. MYNN (P4) must not copy one
+  convention into the other.
+- The absent-optional pattern is verified only with gfortran (P6: flang).
+- Restart: by construction, every step at the default interval refreshes the
+  operator before it is used. A restart-versus-continuous run, and a stamp on
+  the cache's step, belong with the P5 interval contract.
+- Physical qualification on a finer grid, and a configuration with radiation
+  for the cloud-top branch in the model.
+- `run_unit_tests.sh` applies the MMM patch to the build tree as a side effect.
+  The name of `test_tracer_transport_stubs` no longer fits, and repeated
+  `pbl_gas_init` has no unit test.
+- With `flag_qi = .false.`, the YSU wrapper copies out an undefined ice
+  tendency. This is pre-existing and unused by the driver.
 
 ## Verification and completion criteria
 

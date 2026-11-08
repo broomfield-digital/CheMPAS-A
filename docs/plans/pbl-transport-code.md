@@ -828,6 +828,23 @@ flowchart TD
 
 ### 6.3 🟠 YSU wrapper — export the scalar operator, do not mix stale gas
 
+> **As implemented in P3** (see the plan's P3 section). The sketches in 6.2–6.5 are the design; the code
+> differs in these details:
+> - The MMM-physics export is the optional `xkzqx` argument of `bl_ysu_run`, added by the hash-checked
+>   patch `physics/patches/mmm-physics/bl_ysu-export-xkzq.patch`, which the physics Makefile applies.
+>   `xkzqx(k)` sits on the interface between layers k and k+1 (`xkzqx(kte) = 0`). This differs from
+>   `exch_h`, which YSU stores on the bottom face of layer k+1. The wrapper passes it out as the optional
+>   `exch_q`.
+> - `pbl_gas_init(block, nTransport)` reads the configs. The P1 gate wrapper logs the scheme and stops the
+>   model for MYNN (until P4), unknown schemes, a surface layer of `off`, and nondefault intervals (until
+>   P5). The `suite` resolution happens earlier, in `physics_namelist_check`, which also rejects YSU
+>   without a surface layer.
+> - The operator is `G(k+1) = 0.5*(m_d(k)+m_d(k+1))*xkzq(k)/dzc**2`, with `m_d = rho_p/(1+qv)*dz =
+>   zz*rho_zz*dz` (`pbl_gas_exchange`). It is held in module memory per owned column, with an active
+>   mask. There are no Registry restart fields: with `config_pbl_interval = 'none'`, every step refreshes
+>   the operator before it is used, so restart caching waits for P5.
+> - An invalid column (negative or non-finite K, nonpositive mass) stops the model.
+
 ```fortran
 ! ⚪ EXISTING — src/core_atmosphere/physics/physics_wrf/module_bl_ysu.F:237
    integer,  parameter :: nmix = 0
