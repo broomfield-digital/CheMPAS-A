@@ -17,6 +17,8 @@
  use bl_mynn,only: bl_mynn_init
  use module_bl_mynn,only: mynn_bl_driver
  use module_bl_ysu
+ use mpas_atmphys_pbl_gas,only: pbl_gas_enabled,pbl_gas_cache_store_moist_column
+ use mpas_atmphys_utilities,only: physics_error_fatal
 
  implicit none
  private
@@ -24,6 +26,10 @@
           deallocate_pbl, &
           init_pbl,       &
           driver_pbl
+
+!YSU scalar exchange coefficient for MICM gas transport, allocated only when PBL gas transport is enabled
+!(an unallocated array is passed as an absent optional argument):
+ real(kind=RKIND),dimension(:,:,:),allocatable:: kzq_gas_p
 
 !MPAS driver for parameterization of Planetary Boundary Layer (PBL) processes.
 !Laura D. Fowler (send comments to laura@ucar.edu).
@@ -126,6 +132,7 @@
  pbl_select: select case (trim(pbl_scheme))
 
     case("bl_ysu")
+       if(pbl_gas_enabled() .and. .not.allocated(kzq_gas_p)) allocate(kzq_gas_p(ims:ime,kms:kme,jms:jme))
        !from surface-layer model:
        if(.not.allocated(br_p)    ) allocate(br_p(ims:ime,jms:jme)          )
        if(.not.allocated(ctopo_p) ) allocate(ctopo_p(ims:ime,jms:jme)       )
@@ -235,6 +242,7 @@
  pbl_select: select case (trim(pbl_scheme))
 
     case("bl_ysu")
+       if(allocated(kzq_gas_p)) deallocate(kzq_gas_p)
        !from surface-layer model:
        if(allocated(br_p)    ) deallocate(br_p    )
        if(allocated(ctopo_p) ) deallocate(ctopo_p )
@@ -839,7 +847,8 @@
                  psih     = psih_p     , xland    = xland_p     , hfx      = hfx_p      , &
                  qfx      = qfx_p      , wspd     = wspd_p      , br       = br_p       , &
                  dt       = dt_pbl     , kpbl2d   = kpbl_p      , exch_h   = kzh_p      , &
-                 exch_m   = kzm_p      , wstar    = wstar_p     , delta    = delta_p    , &
+                 exch_m   = kzm_p      , exch_q   = kzq_gas_p   ,                         &
+                 wstar    = wstar_p    , delta    = delta_p     ,                         &
                  uoce     = uoce_p     , voce     = voce_p      , rthraten = rthraten_p , &
                  u10      = u10_p      , v10      = v10_p       , ctopo    = ctopo_p    , &
                  ctopo2   = ctopo2_p   , flag_bep = flag_bep    , idiff    = idiff      , &
@@ -850,6 +859,7 @@
                  its = its , ite = ite , jts = jts , jte = jte , kts = kts , kte = kte    &
                 )
        call mpas_timer_stop('bl_ysu')
+       if(pbl_gas_enabled()) call pbl_gas_store_ysu(its,ite)
 
     case("bl_mynn")
        call mpas_pool_get_config(configs,'config_mynn_cloudpdf'   ,bl_mynn_cloudpdf   )
@@ -971,6 +981,26 @@
 !call mpas_log_write('--- end subroutine driver_pbl.')
 
  end subroutine driver_pbl
+
+!=================================================================================================================
+ subroutine pbl_gas_store_ysu(its,ite)
+!=================================================================================================================
+!hand this step's YSU scalar exchange (interface between layers k and k+1) to the MICM gas PBL transport, per
+!owned column; rho_p includes water vapor, and the stored operator uses the dry layer mass.
+ integer,intent(in):: its,ite
+ logical:: ok
+ integer:: i,j
+
+ do j = jts,jte
+ do i = its,ite
+    call pbl_gas_cache_store_moist_column(i,kzq_gas_p(i,kts:kte,j),rho_p(i,kts:kte,j),qv_p(i,kts:kte,j), &
+                                          dz_p(i,kts:kte,j),ok)
+    if(.not.ok) call physics_error_fatal('[transport] PBL: invalid YSU exchange operator for MICM gases '// &
+                                         '(negative or non-finite exchange, or nonpositive layer mass)')
+ enddo
+ enddo
+
+ end subroutine pbl_gas_store_ysu
 
 !=================================================================================================================
  end module mpas_atmphys_driver_pbl

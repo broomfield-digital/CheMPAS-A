@@ -1,13 +1,12 @@
-! Transport core with the production stub processes (P1): nothing is enabled,
-! so assembly and tendency addition must leave every tendency bit unchanged.
+! Transport core with processes that are not enabled (the shared stubs, or a real process module
+! that was not initialized): assembly and tendency addition must leave every tendency bit unchanged.
 program test_tracer_transport_stubs
 
    use mpas_kind_types, only: RKIND, I8KIND
-   use mpas_derived_types, only: block_type
    use unit_assert, only: check, finish
    use mpas_atmphys_tracer_transport
-   use mpas_atmphys_pbl_gas, only: pbl_gas_init, pbl_gas_enabled
-   use mpas_atmphys_cu_gas, only: cu_gas_init, cu_gas_enabled
+   use mpas_atmphys_pbl_gas, only: pbl_gas_enabled
+   use mpas_atmphys_cu_gas, only: cu_gas_enabled
 
    implicit none
 
@@ -15,7 +14,6 @@ program test_tracer_transport_stubs
    real(kind=RKIND) :: scalars(ns,nz,nc), tend(ns,nz,nc), tend0(ns,nz,nc)
    real(kind=RKIND) :: zz(nz,nc), rho_zz(nz,nc), zgrid(nz+1,nc), area(nc), mass(nz,nc)
    type(transport_budget_t) :: b
-   type(block_type) :: blk
    integer :: s, k, i
 
    do i = 1, nc
@@ -35,10 +33,7 @@ program test_tracer_transport_stubs
    area = 1.0_RKIND
    mass = 2.0_RKIND
 
-   ! Shared process interface: init receives the block and the number of transported gases.
-   call pbl_gas_init(blk, 2)
-   call cu_gas_init(blk, 2)
-   call check(.not. pbl_gas_enabled() .and. .not. cu_gas_enabled(), 'stub processes are never enabled')
+   call check(.not. pbl_gas_enabled() .and. .not. cu_gas_enabled(), 'processes are not enabled before initialization')
 
    call tracer_transport_setup([5, 3], nz, nc)
    call check(tracer_transport_n() == 2, 'map is stored')

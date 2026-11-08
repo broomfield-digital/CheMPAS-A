@@ -22,7 +22,7 @@
                   znt,ust,hpbl,psim,psih,                                      &
                   xland,hfx,qfx,wspd,br,                                       &
                   dt,kpbl2d,                                                   &
-                  exch_h,exch_m,                                               &
+                  exch_h,exch_m,exch_q,                                        &
                   wstar,delta,                                                 &
                   u10,v10,                                                     &
                   uoce,voce,                                                   &
@@ -166,6 +166,11 @@
    real(kind=kind_phys),     dimension( ims:ime, kms:kme, jms:jme )          , &
              intent(out  )   ::                                        exch_h, &
                                                                        exch_m
+!  CheMPAS-A: scalar exchange coefficient of the tracer solve at the interface between layers k and k+1
+!  (YSU's xkzq after the entrainment-zone adjustment; requires the MMM-physics export patch).
+   real(kind=kind_phys),     dimension( ims:ime, kms:kme, jms:jme )          , &
+             optional                                                        , &
+             intent(out  )   ::                                        exch_q
    real(kind=kind_phys),     dimension( ims:ime, jms:jme )                   , &
              intent(out  )   ::                                         wstar
    real(kind=kind_phys),     dimension( ims:ime, jms:jme )                   , &
@@ -264,6 +269,7 @@
                                                              dz8w_hv     , &
                                                              exch_h_hv   , &
                                                              exch_m_hv   , &
+                                                             exch_q_hv   , &
                                                              rthraten_hv
 
    real(kind=kind_phys),   dimension(its:ite,kts:kte)      ::              &
@@ -419,6 +425,7 @@
               ,dt=dt,kpbl1d=kpbl2d_hv                                          &
               ,exch_hx=exch_h_hv                                               &
               ,exch_mx=exch_m_hv                                               &
+              ,xkzqx=exch_q_hv                                                 &
               ,wstar=wstar_hv                                                  &
               ,delta=delta_hv                                                  &
               ,u10=u10_hv,v10=v10_hv                                           &
@@ -458,6 +465,7 @@
             rqiblten(i,k,j) = rqiblten_hv(i,k)
             exch_h(i,k,j) = exch_h_hv(i,k)
             exch_m(i,k,j) = exch_m_hv(i,k)
+            if(present(exch_q)) exch_q(i,k,j) = exch_q_hv(i,k)
          end do
       end do
 

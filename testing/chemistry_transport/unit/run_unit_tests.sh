@@ -37,12 +37,17 @@ fi
 
 framework=$repo/src/framework
 core=$repo/src/core_atmosphere
+# The YSU column test needs the MMM-physics export patch (idempotent).
+"$core/physics/apply_mmm_patches.sh" > /dev/null
 esmf_time=$repo/src/external/esmf_time_f90
 
 # Production sources under test, in dependency order.
 sources=(
     "$core/chemistry/musica/mpas_chem_transport_map.F"
     "$core/physics/mpas_atmphys_utilities.F"
+    "$core/physics/ccpp_kind_types.F"
+    "$core/physics/physics_mmm/bl_ysu.F90"
+    "$core/physics/physics_wrf/module_bl_ysu.F"
     "$core/physics/mpas_atmphys_tracer_column.F"
     "$core/physics/mpas_atmphys_pbl_diffusion.F"
     "$core/physics/mpas_atmphys_pbl_gas.F"

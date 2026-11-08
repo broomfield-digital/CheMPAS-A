@@ -2434,6 +2434,11 @@
                      description="logical for turning on/off top-down, radiation_driven mixing"
                      possible_values=".true. to turn on top-down radiation_driven mixing; .false. otherwise"/>
 
+                <nml_option name="config_micm_pbl_transport" type="logical" default_value="false" in_defaults="false"
+                     units="-"
+                     description="Vertically mix every independently transported MICM gas with the active PBL scheme's scalar exchange (YSU at the default PBL interval; other configurations stop at initialization). See docs/plans/pbl-transport.md."
+                     possible_values=".true. or .false."/>
+
                 <nml_option name="config_urban_physics" type="logical" default_value="false" in_defaults="false"
                      units="-"
                      description="logical for turn on/off the urban physics parameterization"
