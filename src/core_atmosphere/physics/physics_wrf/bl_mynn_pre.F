@@ -98,12 +98,13 @@
 
 !-----------------------------------------------------------------------------------------------------------------
 
-!--- initialization:
+!--- initialization (sqs too: MYNN's cloud PDF reads it even when the microphysics has no snow):
  kts = 1
  do k = kts,kte
     do i = its,ite
        sqc(i,k) = 0._kind_phys
        sqi(i,k) = 0._kind_phys
+       sqs(i,k) = 0._kind_phys
     enddo
  enddo
 
