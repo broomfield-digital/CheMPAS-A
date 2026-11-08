@@ -1,0 +1,40 @@
+--- a/physics_mmm/bl_ysu.F90
++++ b/physics_mmm/bl_ysu.F90
+@@ -73,6 +73,7 @@
+                          sfk,vlk,dlu,dlg,frcurb,                           &
+                          flag_bep,                                         &
+                          its,ite,kte,kme,                                  &
++                         xkzqx,                                            &
+                          errmsg,errflg                                     &
+                         )
+ !-------------------------------------------------------------------------------
+@@ -254,6 +255,12 @@
+ !
+    character(len=*), intent(out)   ::                                  errmsg
+    integer,          intent(out)   ::                                  errflg
++!
++!  CheMPAS-A: the exchange coefficient [m2 s-1] that the tracer (qmix) solve uses at the
++!  interface between layers k and k+1, after the entrainment-zone adjustment.
++   real(kind=kind_phys),     dimension( its:,: )                             , &
++             optional                                                        , &
++             intent(out  )   ::                                         xkzqx
+ 
+ !
+ ! local vars
+@@ -1173,6 +1180,16 @@
+          r1(i,k) = f1(i,k)
+       enddo
+    enddo
++!
++!--- CheMPAS-A: export the final scalar exchange coefficient (the qv/qc/qi/qmix matrix).
++   if(present(xkzqx)) then
++      do i = its,ite
++         do k = kts,kte-1
++            xkzqx(i,k) = xkzq(i,k)
++         enddo
++         xkzqx(i,kte) = 0.
++      enddo
++   endif
+    call tridin_ysu(al,adv,cu,r1,au,f1,its,ite,kts,kte,1)
+ 
+    do i = its,ite

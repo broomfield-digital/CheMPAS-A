@@ -5,6 +5,7 @@ COREDEF = -Dmpas
 endif
 
 all:
+	./apply_mmm_patches.sh --revert
 	./../tools/manage_externals/checkout_externals --externals ./../Externals.cfg
 	$(MAKE) lookup_tables core_physics_init core_physics_mmm core_UGWP core_physics_wrf core_physics_noahmp core_physics
 
@@ -63,6 +64,7 @@ lookup_tables:
 	./checkout_data_files.sh
 
 core_physics_mmm: core_physics_init
+	./apply_mmm_patches.sh
 	(cd physics_mmm; $(MAKE) -f Makefile.mpas all)
 
 core_UGWP: core_physics_init
