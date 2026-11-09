@@ -111,6 +111,86 @@ def test_bitwise_difference_counts_one_ulp():
     assert cp.count_bitwise_differences(a, b) == 1
 
 
+def write_history(path, times, ids, qno, theta):
+    """A minimal MPAS history file: xtime, indexToCellID, qNO and theta (Time, nCells, nVertLevels)."""
+    from netCDF4 import Dataset
+    with Dataset(path, "w") as d:
+        d.createDimension("Time", None)
+        d.createDimension("StrLen", 64)
+        d.createDimension("nCells", len(ids))
+        d.createDimension("nVertLevels", qno.shape[-1])
+        xt = d.createVariable("xtime", "S1", ("Time", "StrLen"))
+        for i, t in enumerate(times):
+            xt[i] = np.array(list(t.ljust(64)), dtype="S1")
+        d.createVariable("indexToCellID", "i4", ("nCells",))[:] = ids
+        d.createVariable("qNO", "f8", ("Time", "nCells", "nVertLevels"))[:] = qno
+        d.createVariable("theta", "f8", ("Time", "nCells", "nVertLevels"))[:] = theta
+
+
+def history_pair(tmp, perturb=None, permute=False):
+    times = ["0000-01-01_18:01:12", "0000-01-01_18:02:24"]
+    ids = np.array([1, 2, 3, 4])
+    qno = np.linspace(1.0e-9, 2.0e-9, 2 * 4 * 3).reshape(2, 4, 3)
+    theta = np.linspace(300.0, 310.0, 2 * 4 * 3).reshape(2, 4, 3)
+    write_history(tmp / "a.nc", times, ids, qno, theta)
+    q2, t2, ids2 = qno.copy(), theta.copy(), ids.copy()
+    if perturb is not None:
+        q2[1, 2, 1] *= 1.0 + perturb
+    if permute:
+        order = np.array([2, 0, 3, 1])
+        q2, t2, ids2 = q2[:, order], t2[:, order], ids2[order]
+    write_history(tmp / "b.nc", times[1:], ids2, q2[1:], t2[1:])    # b holds only the later record
+    return tmp / "a.nc", tmp / "b.nc"
+
+
+def test_compare_at_identical_record_is_bitwise():
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        a, b = history_pair(Path(tmp))
+        result = cp.compare_at(a, b, "0000-01-01_18:02:24")
+        assert result["passed"] and all(r["n_outside"] == 0 for r in result["fields"].values())
+
+
+def test_compare_at_tiny_change_fails_bitwise_but_passes_tolerance():
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        a, b = history_pair(Path(tmp), perturb=1.0e-15)
+        assert not cp.compare_at(a, b, "0000-01-01_18:02:24")["passed"]
+        result = cp.compare_at(a, b, "0000-01-01_18:02:24", atol=1.0e-18, rtol=1.0e-10)
+        assert result["passed"] and result["fields"]["qNO"]["max_abs"] > 0.0
+
+
+def test_compare_at_aligns_cells_by_id():
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        a, b = history_pair(Path(tmp), permute=True)
+        assert cp.compare_at(a, b, "0000-01-01_18:02:24")["passed"]
+
+
+def test_compare_at_named_fields_only():
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        a, b = history_pair(Path(tmp), perturb=1.0e-6)
+        assert set(cp.compare_at(a, b, "0000-01-01_18:02:24", fields=["theta"])["fields"]) == {"theta"}
+        assert cp.compare_at(a, b, "0000-01-01_18:02:24", fields=["theta"])["passed"]
+
+
+def test_compare_at_excludes_named_fields():
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        a, b = history_pair(Path(tmp), perturb=1.0e-6)
+        assert not cp.compare_at(a, b, "0000-01-01_18:02:24")["passed"]
+        result = cp.compare_at(a, b, "0000-01-01_18:02:24", exclude=["qNO"])
+        assert result["passed"] and "qNO" not in result["fields"] and "theta" in result["fields"]
+
+
+def test_compare_at_missing_time_fails():
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        a, b = history_pair(Path(tmp))
+        assert not cp.compare_at(a, b, "0000-01-01_18:03:00")["passed"]
+
+
 if __name__ == "__main__":
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_")]
     for test in tests:

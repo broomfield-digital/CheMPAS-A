@@ -183,8 +183,16 @@ program test_pbl_gas
    call pbl_gas_begin_step(3.0_RKIND)
    call check(.true., 'three steps of a 9 s operator after a refresh are accepted')
 
+   ! Repeated initialization (pbl_gas_init finalizes, then sets the cache up; P3 deferred, P5): a second setup
+   ! starts every column inactive, and finalizing twice is safe.
+   call pbl_gas_cache_setup(nz, 3, nup=2, ndown=1)
+   call pbl_gas_cache_store_column(1, [10.0_RKIND, 10.0_RKIND, 10.0_RKIND, 10.0_RKIND], m_d, dz, ok)
+   call check(ok .and. pbl_gas_active(1), 'a column is active before the repeated setup')
+   call pbl_gas_cache_setup(nz, 3)
+   call check(.not. pbl_gas_active(1) .and. .not. pbl_gas_active(3), 'a repeated cache setup starts every column inactive')
    call pbl_gas_finalize()
-   call check(pbl_gas_refresh_time() == -1.0_RKIND, 'finalize clears the refresh stamp')
+   call pbl_gas_finalize()
+   call check(pbl_gas_refresh_time() == -1.0_RKIND, 'finalize clears the refresh stamp, twice over')
    call check(.not. pbl_gas_active(1), 'finalize releases the cache')
    call check(.not. pbl_gas_enabled(), 'transport is not enabled without initialization')
 

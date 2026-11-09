@@ -23,6 +23,12 @@ docs/plans/pbl-transport.md). Reads MPAS history files (output.nc).
       scheme's free-atmosphere coefficient in either regime.
   compare RUN_A RUN_B
       Every output field is bitwise identical.
+  compare-at RUN_A RUN_B TIME [--atol A --rtol R] [--gases-only | --fields F ...] [--exclude F ...]
+             [--json PATH]
+      The records at xtime TIME, with cells aligned by indexToCellID: bitwise
+      identical by default, else |a - b| <= A + R*|b| in every element (restart
+      against continuous, and different MPI decompositions; P5). Reports the
+      largest differences of every differing field.
 
 Layer mass m = areaCell * dz * zz * rho_zz, the dry-air weight MPAS conserves.
 """
@@ -204,6 +210,80 @@ def cmd_stronger(args):
     return 1 if failures else 0
 
 
+def _xtimes(ds):
+    return ["".join(c.decode() for c in row).strip() for row in ds["xtime"][:]]
+
+
+def compare_at(path_a, path_b, time, atol=0.0, rtol=0.0, fields=None, exclude=()):
+    """Compare the record at TIME (xtime) of two MPAS history files, with cells aligned by indexToCellID.
+
+    With atol = rtol = 0 an element matches only if it is bitwise identical; otherwise it matches when
+    |a - b| <= atol + rtol*|b|. fields restricts the comparison to the named variables (default: every
+    numeric variable in both files), less the names in exclude. Returns {"passed", "time", "missing", "fields": {name: {"n_outside",
+    "size", "max_abs", "max_rel"}}}."""
+    result = {"time": time, "fields": {}, "missing": [], "passed": False}
+    with Dataset(path_a) as da, Dataset(path_b) as db:
+        da.set_auto_mask(False)
+        db.set_auto_mask(False)
+        ta, tb = _xtimes(da), _xtimes(db)
+        if time not in ta or time not in tb:
+            result["missing"].append(f"record {time} (a: {time in ta}, b: {time in tb})")
+            return result
+        ra, rb = ta.index(time), tb.index(time)
+        order_a = np.argsort(da["indexToCellID"][:])
+        order_b = np.argsort(db["indexToCellID"][:])
+        if not np.array_equal(da["indexToCellID"][:][order_a], db["indexToCellID"][:][order_b]):
+            result["missing"].append("different cell sets")
+            return result
+        numeric = lambda d: {n for n, v in d.variables.items() if v.dtype.kind in "iuf"}
+        names = sorted(numeric(da) & numeric(db)) if fields is None else list(fields)
+        names = [n for n in names if n not in set(exclude)]
+        for name in names:
+            if name not in da.variables or name not in db.variables:
+                result["missing"].append(name)
+                continue
+            va, vb = da[name], db[name]
+            xa, xb = va[:], vb[:]
+            if va.dimensions and va.dimensions[0] == "Time":
+                xa, xb = xa[ra], xb[rb]
+            dims = va.dimensions[1:] if va.dimensions and va.dimensions[0] == "Time" else va.dimensions
+            if "nCells" in dims:
+                axis = dims.index("nCells")
+                xa, xb = np.take(xa, order_a, axis=axis), np.take(xb, order_b, axis=axis)
+            xa, xb = np.asarray(xa), np.asarray(xb)
+            if atol == 0.0 and rtol == 0.0:
+                n_out = count_bitwise_differences(xa, xb)
+            else:
+                n_out = int(np.count_nonzero(~(np.abs(xa.astype(float) - xb.astype(float))
+                                               <= atol + rtol * np.abs(xb.astype(float)))))
+            diff = np.abs(xa.astype(float) - xb.astype(float)) if xa.shape == xb.shape else np.array([np.inf])
+            scale = np.maximum(np.abs(xb.astype(float)), np.finfo(float).tiny) if xa.shape == xb.shape else 1.0
+            result["fields"][name] = {"n_outside": n_out, "size": int(xa.size),
+                                      "max_abs": float(diff.max()) if diff.size else 0.0,
+                                      "max_rel": float((diff / scale).max()) if diff.size else 0.0}
+    result["passed"] = not result["missing"] and all(r["n_outside"] == 0 for r in result["fields"].values())
+    return result
+
+
+def cmd_compare_at(args):
+    fields = list(GASES) if args.gases_only else args.fields
+    result = compare_at(Path(args.a) / "output.nc", Path(args.b) / "output.nc", args.time,
+                        atol=args.atol, rtol=args.rtol, fields=fields, exclude=args.exclude or ())
+    mode = "bitwise" if args.atol == 0.0 and args.rtol == 0.0 else f"atol={args.atol:g}, rtol={args.rtol:g}"
+    differing = {n: r for n, r in result["fields"].items() if r["n_outside"]}
+    for name, r in sorted(differing.items()):
+        print(f"  {name}: {r['n_outside']} of {r['size']} outside; max |diff| {r['max_abs']:.3e}, "
+              f"max rel {r['max_rel']:.3e}")
+    if args.json:
+        Path(args.json).write_text(json.dumps(result, indent=1) + "\n")
+    failures = []
+    check(not result["missing"], f"record {args.time} and fields present (missing: {result['missing'] or 'none'})",
+          failures)
+    check(not differing, f"{len(result['fields'])} fields at {args.time} agree ({mode}); differing: "
+          f"{sorted(differing) or 'none'}", failures)
+    return 1 if failures else 0
+
+
 def cmd_compare(args):
     failures = []
     a, b = Run(args.a), Run(args.b)
@@ -232,6 +312,17 @@ def main(argv=None):
     p.add_argument("a")
     p.add_argument("b")
     p.set_defaults(func=cmd_compare)
+    p = sub.add_parser("compare-at")
+    p.add_argument("a")
+    p.add_argument("b")
+    p.add_argument("time", help="xtime of the record, e.g. 0000-01-01_18:02:24")
+    p.add_argument("--atol", type=float, default=0.0)
+    p.add_argument("--rtol", type=float, default=0.0)
+    p.add_argument("--gases-only", action="store_true", help=f"compare only {', '.join(GASES)}")
+    p.add_argument("--fields", nargs="+")
+    p.add_argument("--exclude", nargs="+", help="leave these fields out (e.g. the gases)")
+    p.add_argument("--json")
+    p.set_defaults(func=cmd_compare_at)
     args = parser.parse_args(argv)
     return args.func(args)
 
