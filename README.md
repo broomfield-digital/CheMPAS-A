@@ -71,6 +71,7 @@ toolchain.
 - [Reconstructable examples](https://github.com/NCAR/CheMPAS-A/wiki/Examples)
 - [Global chemistry and emissions MVP](https://github.com/NCAR/CheMPAS-A/wiki/Global-Chemistry-and-Emissions)
 - [Data and provenance](https://github.com/NCAR/CheMPAS-A/wiki/Data-and-Provenance)
+- [PBL transport of MICM gases](docs/chempas/guides/pbl-gas-transport.md)
 
 Chemistry is enabled only in a `MUSICA=true` atmosphere build. An empty
 `config_micm_file` leaves the chemistry coupling inactive. Chemistry currently

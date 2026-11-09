@@ -4,16 +4,22 @@ Status: the P1 shared foundation (`0e2f15f6`), P2, the column diffusion kernel
 and tendency proof (`7ae5f39d` shared, `0eb2c8ad`), P3, YSU gas transport at the
 default PBL interval (see [P3](#p3-ysu-gas-pbl-transport-implemented)), and P4,
 MYNN gas transport with its local diffusion, updrafts and downdrafts (see
-[P4](#p4-mynn-gas-pbl-transport-implemented)), are implemented. Intervals/restart
-and toolchain qualification (P5–P6) are pending. The work completes for
-convection-resolving configurations, with parameterized convection off, the
+[P4](#p4-mynn-gas-pbl-transport-implemented)), are implemented. So are P5, PBL
+intervals, restart, chemistry intervals, MPI and the gate against parameterized
+convection (see the [P5 plan](#p5-plan-pbl-intervals-restart-and-mpi)), and P6,
+the GNU Fortran eight-rank qualification (see
+[P6](#p6-gnu-fortran-eight-rank-qualification-implemented)). The work is complete
+for convection-resolving configurations, with parameterized convection off, the
 first science target being the resolved supercell. Qualification with
-parameterized convection belongs to the convective transport plan (#41); see the
-[P5 plan](#p5-plan-pbl-intervals-restart-and-mpi).
+parameterized convection belongs to the convective transport plan (#41); the
+Clang/Flang build is deferred. Users start from the
+[user guide](../chempas/guides/pbl-gas-transport.md).
 
 - Tracking issue: [CheMPAS-A #40](https://github.com/NCAR/CheMPAS-A/issues/40).
 - Branch: `chempas-a-pbl`, from `chempas-a` at
-  `89008ed50ce8f9ffd10876deed7c9a48ec573a38`.
+  `89008ed50ce8f9ffd10876deed7c9a48ec573a38`. P5 Tasks 3–7 and P6 are on
+  `chempas-a-pbl-complete`, from `chempas-a-pbl` at `a267582b` (tag
+  `pbl-checkpoint-2026-11-08`).
 - Companion: [convective transport plan](https://github.com/NCAR/CheMPAS-A/blob/chempas-a-convect/docs/plans/convective-transport.md).
 - Coordination: [MUSICA #1073](https://github.com/NCAR/musica/issues/1073).
 - Source/issue audit: 2026-10-18. These are development plans, not supported
@@ -119,7 +125,7 @@ is a supported zero-transport case; an active PBL with surface layer off is not.
 | MYNN with `config_mynn_edmf=0`, `config_mynn_edmf_dd=0` | Add a clean MPAS passive-gas interface using the scheme's scalar diffusivity and an implicit dry-mass flux-divergence solve. | Uniform, zero, pulse, sharp-gradient, and nonuniform-density columns; zero flux at both external boundaries. |
 | MYNN with updraft EDMF | Export/reuse plume geometry and entrainment coefficients; recompute plume concentrations from current gas profiles, include plume tracer flux and compensating environment transport together with diffusion. | Updraft-only and combined diffusion/EDMF budgets and nonnegativity. `edmf_a`, `edmf_w`, or `exch_h` alone are not the complete operator. |
 | MYNN downdraft EDMF | Extend the adapter through the downdraft pathway and its environmental compensation. | Remains explicitly unsupported until downdraft tracer budgets pass; do not silently use the updraft-only operator. |
-| Nondefault PBL intervals | Diagnose and repair the alarm/`dt_pbl` contract as a separately reviewable change before qualification. Specify coefficient refresh times and per-step gas application. | Initially reject nondefault intervals when gas PBL transport is enabled. Lift the restriction only after interval/restart tests and native-meteorology regressions establish the intended cadence. Disabled gas transport must not acquire an incidental cadence change. |
+| Nondefault PBL intervals | Diagnose and repair the alarm/`dt_pbl` contract as a separately reviewable change before qualification. Specify coefficient refresh times and per-step gas application. | Initially reject nondefault intervals when gas PBL transport is enabled. Lift the restriction only after interval/restart tests and native-meteorology regressions establish the intended cadence. Disabled gas transport must not acquire an incidental cadence change. Lifted in P5 (`d2ac0898`): the cadence is repaired (`d90b9fd7`), and the operator from the last PBL call is applied every step and stamped, with interval, restart, chemistry-interval and MPI checks. |
 | Parameterized convection active | Not qualified here. The native convection schemes do not carry MICM gases, so PBL mixing alone would leave them trapped below cloud base. The PBL-then-convection tendency sequence of the shared interface stays ready for #41. | Reject gas PBL transport with any active convection scheme, including scale-aware Grell-Freitas in the `convection_permitting` suite. The convective transport plan (#41) lifts the restriction after its coupled PBL + convection + MICM qualification. |
 
 Do not enable WRF chemistry/emissions macros globally. Adapt passive-gas
@@ -155,10 +161,11 @@ deterministic application, and retained license notices. An edited ignored
   `a68d7598`, `c5e144da`, `9eca3f99`, `0c21a646`, `2181961a`, `872e9255` and
   `fd9ccbe8`; see
   [P4](#p4-mynn-gas-pbl-transport-implemented).
-- [ ] P5: nondefault interval contract, cache restart behavior, chemistry
-  intervals, MPI/halo checks, and the gate against parameterized convection; see
-  the [P5 plan](#p5-plan-pbl-intervals-restart-and-mpi). The PBL-interval repair
-  is in `d90b9fd7`.
+- [x] P5: nondefault interval contract, cache restart behavior, chemistry
+  intervals, MPI/halo checks, and the gate against parameterized convection.
+  Commits `d90b9fd7` (native PBL cadence repair), `25d09c38`, `f62f5423`,
+  `d2ac0898`, `72fb7399`, `a9a7d2c7`, `d4e7c954` and `bdf8aea2`; see the
+  [P5 plan](#p5-plan-pbl-intervals-restart-and-mpi).
 - [ ] P6: GCC/gfortran eight-rank results, supported-configuration table
   (convection-resolving configurations), reproducible fixtures, and user
   configuration documentation. The Clang/Flang build is deferred (decided
@@ -1040,10 +1047,242 @@ right. The options:
   `'none'` is bitwise identical to the executable before the repair. After 60 s the
   9 s run differs from the every-step run by at most 1.1e-3 K in θ and 2 m in the
   PBL height. Gas transport still rejects nondefault intervals until Task 3.
+- Task 3 (`25d09c38`, `d2ac0898`). After each PBL call the driver stamps the gas
+  operator cache with the model time and `dt_pbl`
+  (`pbl_gas_cache_refreshed`). Transport applies the held operator every step
+  with the model `dt`. Before each use, `pbl_gas_begin_step` stops the model if
+  the operator was never built, or if `age*dt >= interval`, which means a refresh
+  was missed. The pbl alarm rings at the first step at or after each interval,
+  so the oldest operator used is `ceiling(interval/dt) - 1` steps old. The
+  interval gate is lifted for YSU and MYNN.
+
+  At the default interval, 60-s YSU and MYNN runs with transport on are bitwise
+  identical to the pre-P5 executable. `check_pbl_intervals.sh` covers 9-s
+  intervals for YSU and MYNN:
+  - the non-gas fields are bitwise identical with transport off and on;
+  - gas mass is conserved (drift ≤ 4e-16), and the gases mix down-gradient;
+  - the budget log shows refreshes at 0, 9, …, 54 s.
+
+  With a 10-s interval and 3-s steps the refreshes are at 0, 12, 21, 30, 42 and
+  51 s. PBL off, with transport requested and an interval, runs as a
+  zero-transport case. `check_pbl_ysu.sh` and `check_pbl_mynn.sh` pass, with
+  their interval gate cases turned into runs that must succeed.
+- Budget diagnostics (`f62f5423`), for the completion criteria.
+  `config_micm_transport_budget` logs, each step, per process and gas, the
+  domain budget reduced over ranks:
+  - the dry-air-weighted mass before and after, the increment and its relative
+    size;
+  - the largest column residual and the extrema;
+  - the active columns, the refresh time and `dt`.
+
+  `check_transport_budget.py` checks it. A 60-s YSU run has |rel| ≤ 1.6e-16 and
+  column residuals ≤ 1e-15, and the output is bitwise identical with the option
+  off.
+- Task 4 (`a9a7d2c7`). The operator is not restarted. The pbl alarm starts at
+  the restart time, so the first step rebuilds the operator, a tested
+  deterministic reconstruction (shared interface item 8).
+  `check_pbl_restart.sh` runs 144 s continuously with a restart at 72 s, and
+  72 s again from that restart, with transport on. YSU and MYNN, at `'none'`
+  and at 9 s: every output field at 144 s is bitwise identical, as in a
+  transport-off pair. A restart at 60 s, off the 9-s boundary, runs to
+  completion. The PBL cadence then shifts, as radiation's does: after 60 s, θ
+  differs by up to 1.2e-5 K and NO by up to 3e-5 relative. That is reported,
+  not required to vanish. A unit test covers repeated initialization.
+- Task 7 (`72fb7399`). Gas PBL transport stops at initialization with any
+  active convection scheme, with a message naming #41. That includes
+  Grell-Freitas of the `convection_permitting` suite; `physics_namelist_check`
+  resolves the suite before transport starts. It also stops with more than one
+  OpenMP thread. PBL off stays a zero-transport case. In-model, YSU with new
+  Tiedtke stops with the message, while transport with convection off runs, and
+  so does convection with transport off. The OpenMP gate is unit-tested only:
+  the builds use `OPENMP=false`.
+- Task 5 (`d4e7c954`). `check_pbl_chemistry_intervals.sh` runs YSU and MYNN
+  with chemistry every 3, 9 and 21 s, with the reactive LNOx mechanism and NO2
+  photolysis, transport off and on, for 63 s. In each pair:
+  - the non-gas fields at 63 s are bitwise identical;
+  - nitrogen (NO + NO2) and odd oxygen (NO2 + O3) drift by at most 4.9e-16;
+  - no gas falls below the nonnegativity floor;
+  - the budget log is conservative on all 21 steps (|rel| ≤ 3.3e-16, column
+    residuals ≤ 1.3e-15).
+
+  `check_realized_increment.sh` adds chemistry every 9 and 21 s to its
+  advection modes; the realized increments match the requested ones to 5e-23.
+- Task 6 (`bdf8aea2`). `check_pbl_mpi.sh` runs YSU and MYNN at a 9-s PBL
+  interval on 1, 2, 4 and 8 ranks. It requires the gases at 60 s to agree with
+  the 8-rank run within atol 1e-18 and rtol 1e-10; in fact every output field
+  is bitwise identical for each rank count. A unit case with every transport
+  process inactive leaves the gases untouched.
 
 Out of scope here: coupling with parameterized convection (#41's plan), OpenMP
-thread-private buffers (the builds use `OPENMP=false`; noted for P6), the
-deferred Clang/Flang build, and the P3/P4 items deferred to P6.
+thread-private buffers (the builds use `OPENMP=false`), the deferred Clang/Flang
+build, and the P3/P4 items deferred to P6 (see [P6](#p6-gnu-fortran-eight-rank-qualification-implemented)).
+
+### Upstream report (draft, not filed)
+
+Filing it is an outward-facing step for the maintainers.
+
+> **`config_pbl_interval` sets `dt_pbl`, but the surface and PBL schemes still
+> run every step**
+>
+> In `mpas_atmphys_manager.F`, `physics_run_init` creates the `pbl` alarm from
+> `config_pbl_interval` and sets `dt_pbl` to that interval. Nothing tests the
+> alarm, though: `physics_timetracker` checks the radiation, convection and
+> other physics alarms, never `pbl`. `physics_driver` (`mpas_atmphys_driver.F`)
+> calls `driver_sfclayer`, `driver_lsm`, `driver_pbl` and `driver_gwdo` on every
+> physics step. Those schemes, the ocean mixed layer and sea ice integrate with
+> `dt_pbl`. With an interval longer than `config_dt`, each step therefore
+> advances them by the interval. The land surface runs interval/dt times too
+> fast, and the PBL tendencies come from an implicit step of the wrong length.
+> Only `'none'` (`dt_pbl = dt`) is consistent.
+>
+> To reproduce, run the idealized supercell with `config_dt = 3` and
+> `config_pbl_interval = '00:00:09'` for 20 steps. The log reports
+> `DT_PBL = 9`, and the timer summary shows the surface layer and PBL called on
+> all 20 steps.
+>
+> A fix: set a flag from the `pbl` alarm in `physics_timetracker`, as `l_conv`
+> is set from the convection alarm. Run the surface layer, land surface, ocean
+> mixed layer, sea ice, surface diagnostics, PBL and gravity-wave drag only when
+> it is set, and hold their tendencies in between. The tendencies already live
+> in `tend_physics` and the restart stream. Gravity-wave drag must be in the
+> group, because it adds its drag to the held PBL tendency. With the fix, a 9-s
+> interval gives 7 calls in 20 steps. An interval equal to `config_dt` is
+> bitwise identical to `'none'`, and `'none'` is unchanged. The fix is in
+> CheMPAS-A commit `d90b9fd7`.
+
+## P6 GNU Fortran eight-rank qualification (implemented)
+
+P6 qualifies MICM gas PBL transport for convection-resolving configurations,
+built with GNU Fortran 15.2.0 (conda-forge), Open MPI 5.0.10, NetCDF-C 4.10.1,
+NetCDF-Fortran 4.6.3, PIO 2.6.9 and the pinned MUSICA 0.16.5, in double
+precision without OpenMP, on eight ranks.
+
+### Supported configurations
+
+| Setting | Supported | Stops at initialization |
+| --- | --- | --- |
+| PBL scheme | `bl_ysu`, with or without `config_ysu_pblmix`; `bl_mynn` with local diffusion, with updrafts (`config_mynn_edmf = 1`), and with updrafts and downdrafts (`config_mynn_edmf_dd = 1`); `off` (zero transport) | any other scheme |
+| `config_pbl_interval` | any; the operator from the last PBL call is applied every step | — |
+| `config_convection_scheme` | `'off'` | any other, including the Grell-Freitas of `convection_permitting` (#41) |
+| `config_chemistry_interval` | any (3, 9 and 21 s tested) | — |
+| Restart | yes; the operator is rebuilt at the restart's first step | — |
+| MPI | any rank count (1, 2, 4 and 8 tested) | — |
+| OpenMP | one thread | more than one thread |
+| Toolchain | GNU Fortran; Clang/Flang not qualified | — |
+
+### Fixtures and results
+
+`testing/chemistry_transport/run_pbl_qualification.sh` runs every check in
+order and writes a summary and a manifest. The final run is recorded in
+⟨TBD: results link⟩.
+
+⟨TBD: results table⟩
+
+### Finer vertical grid
+
+`prepare_fine_grid.sh` builds a supercell grid with 100 layers: 50 m up to
+1.5 km, then stretched by at most 10% per layer to the baseline's 50-km top
+(`make_fine_zeta_levels.py`). On the baseline grid, with interfaces at 0, 299,
+712 and 1182 m, the PBL spans only one or two layers and MYNN's plumes never
+start. `check_pbl_fine.sh` runs YSU, MYNN with updrafts, and MYNN at a 9-s
+interval for 10 min on the convective init.
+
+Each pair runs with transport off and on. In every pair, every non-gas field
+is bitwise identical between the two runs. Gas mass is conserved within
+4.4e-16, every gas stays nonnegative, and the budget log passes for all
+200 steps.
+
+| Case | PBL layers (median hpbl) | NO range: on / off / replay | Mixing, fraction of the replay | Updraft columns | Budget max \|rel\| |
+| --- | --- | --- | --- | --- | --- |
+| YSU | 15 (727 m) | 0.87 / 1.79 / 0.74 | 0.81 | — | 4.8e-16 |
+| MYNN with updrafts | 18 (901 m) | 1.64 / 2.10 / 1.66 | 1.04 | 98.9% | 6.2e-16 |
+| MYNN, 9-s interval | 18 (902 m) | 1.64 / 2.10 / 1.66 | 1.04 | 98.9% | 6.2e-16 |
+
+The NO range is the domain median of `(max - min)/mean` over the layers below
+0.8·hpbl at 10 min; the initial NO falls off as exp(-z/300 m). The replay
+diffuses the initial NO offline with the scheme's own `kzh` from the output.
+The mixing column is ln(off/on) divided by ln(off/replay); the check requires
+0.5 to 2. A run without transport scores 0 and fails.
+
+Ten minutes is shorter than the PBL's mixing time, so NO is not yet well mixed.
+For YSU, the mean `kzh` in the PBL is 37–52 m²/s and the slowest mode's time
+scale, (hpbl/π)²/K, is about 16 min. MYNN starts with little TKE: its mean
+`kzh` grows from 2 to 7 m²/s over the run. The plan's first criterion, a range
+5 times smaller with transport, was out of reach for a correct operator; the
+replay itself reaches only 2.4 for YSU and 1.27 for MYNN. The criterion is now
+agreement with the replay. YSU mixes slightly less than the replay, as
+expected. Its scalar coefficient `xkzq` does not exceed the heat coefficient
+`kzh` inside the PBL, and the replay holds each minute's latest, growing K.
+
+MYNN's updrafts are active in 98.9% of the columns on this grid. On the
+baseline grid they never started. The mass-flux path therefore now runs in
+the model with gas transport on, conserves, and leaves the meteorology
+bitwise unchanged. Over these 10 min the updrafts add little to the mixing of
+NO measured this way. The mass-flux rate itself rests on the column tests.
+
+The supercell namelist's explicit vertical eddy viscosity
+(`config_v_mom_eddy_visc2 = config_v_theta_eddy_visc2 = 500 m2/s`) is off in
+these cases. It is a tendency computed once per step, so it is stable only for
+K·dt/dz² ≤ 0.5. On 50-m layers at dt = 3 s that number is 0.6, against 0.017
+on the baseline grid, and every fine-grid run blew up after about 100 s,
+transport off included (w rose from 1 to 13 m/s within a few steps, then went
+to NaN). With the term off at dt = 3 s, or kept at dt = 2 s, 4-min runs stay
+stable. Off is the choice here: it keeps the 3-s step of every other check and
+leaves the resolved boundary layer to the PBL scheme.
+
+### Reactive regression
+
+`check_pbl_reactive.sh` uses the baseline LNOx mechanism with NO2 photolysis
+(`config_j_no2_max = 0.01`). Each case runs with transport off and on. Without
+lightning, nitrogen (NO + NO2) and odd oxygen (NO2 + O3) are conserved by the
+reactions and by transport. Lightning adds NO only, so odd oxygen stays
+conserved with it. Invariants are in moles, weighted by dry-air mass.
+
+| Case | Non-gas fields | Nitrogen drift | Odd-oxygen drift | Budget |
+| --- | --- | --- | --- | --- |
+| Stable init, YSU, 5 min | 22 bitwise | 1.6e-16 | 1.3e-16 | 100 steps, max \|rel\| 7.3e-16, residual 2.9e-15 |
+| Stable init, MYNN, 5 min | 24 bitwise | 4.9e-16 | 1.3e-16 | 100 steps, max \|rel\| 1.7e-16, residual 1.5e-15 |
+| Supercell init with lightning, YSU, 30 min | 22 bitwise | (source) | 1.2e-16 | 600 steps, max \|rel\| 1.9e-16, residual 1.1e-15 |
+
+The drift limit is 1e-12. Every value of NO, NO2 and O3 stayed above the
+nonnegativity floor. These are numerical checks of conservation; they do not
+validate the chemistry or the lightning source.
+
+### Rulings
+
+- The Chapman+NOx case runs on the global JW mesh without a land surface. At
+  that spacing it needs parameterized convection, which is outside the
+  convection-resolving configurations qualified here.
+- The reactive regression uses the LNOx mechanism's linear invariants. The ABBA
+  mechanism was a development case and is being retired.
+- The LNOx case with lightning runs 30 min, because lightning starts after about
+  10 min of storm spin-up.
+- MPI decomposition: the check requires the gases to agree within atol 1e-18 and
+  rtol 1e-10; every output field turned out bitwise identical.
+- A restart off the PBL interval boundary shifts the PBL cadence, as it does for
+  radiation. It is reported, not required to match.
+- The fine-grid cases switch off the explicit vertical eddy viscosity (above).
+- The fine-grid mixing check compares the model with an offline replay using
+  the scheme's own diffusivity, not with a fixed factor. In 10 min, a correct
+  operator cannot mix the PBL well (above). The band of a factor of 2 accepts
+  a rate error of up to 2 in the model. The column tests pin the rate exactly.
+
+### Deferred
+
+- The Clang/Flang build, including the absent-optional pattern of the YSU
+  wrapper, until a Flang platform is in use.
+- OpenMP: thread-private buffers for the operator caches. Until then,
+  initialization stops with more than one thread.
+- MYNN plume cache sizing: the caches hold `(2*nlev+1)*13` values per column,
+  and each substep rebuilds the plumes over the full column. Storing only up to
+  the highest plume top would cut both.
+- A configuration with radiation, for YSU's cloud-top branch in the model.
+- The budget option's per-step MPI reductions; it is a diagnostic, off by
+  default.
+- Upstream reports, outward-facing and for the maintainers: the native PBL
+  cadence defect (draft above), the MMM-physics export patches, `DDMF_JPL`'s
+  velocity limiter and out-of-bounds diagnostic reads, and the snow conversion
+  in `bl_mynn_pre_run`.
 
 ## Verification and completion criteria
 
@@ -1060,7 +1299,7 @@ results tracked alongside this plan.
 | Column physics | Nonuniform dry density and layer spacing; uniform profiles; isolated lower/middle/top pulses; sharp gradients; zero and near-zero species; diffusion/nonlocal components separately; zero coefficients and large stable timesteps. Check every species, not just a sum over gases. Compare diffusion against an independently assembled matrix or analytic constant-coefficient mode. |
 | Active PBL | Stable and convective boundary-layer fixtures with YSU and each qualified MYNN mode; show nonzero exchange and redistribution of every gradient tracer. Keep convection and chemical reactions off initially, with an inert MICM mechanism still loaded. |
 | Time/parallel/restart | Repeat many updates with chemistry intervals of 1, 3, and 7 model steps; test qualified physics intervals separately, including no-mixing transitions. Compare one and eight ranks by `indexToCellID`, include ranks with no active columns, and restart between refresh times. Check thread-private buffers if OpenMP is enabled. |
-| Coupled/regression | Reactive ABBA and Chapman/NOx cases, then the resolved supercell LNOx case with PBL transport. Check transport-only budgets before chemistry and reaction invariants afterwards. Compare disabled transport to the unmodified base, including native meteorology. Exercise each supported scalar advection setting. PBL + parameterized convection + MICM is qualified under #41, not here. |
+| Coupled/regression | Reactive cases with linear invariants (P6: LNOx nitrogen and odd oxygen; the ABBA development mechanism is being retired, and Chapman/NOx is outside the convection-resolving subset), then the resolved supercell LNOx case with PBL transport. Check transport-only budgets before chemistry and reaction invariants afterwards. Compare disabled transport to the unmodified base, including native meteorology. Exercise each supported scalar advection setting. PBL + parameterized convection + MICM is qualified under #41, not here. |
 | Toolchains/output | A double-precision GCC/gfortran build of the full pinned CheMPAS-A/MUSICA stack, with eight-rank NetCDF runs. A build of plain MPAS or a chemistry run from before the transport work does not satisfy this gate. A Clang/Flang build is deferred until a Flang platform is in use. |
 
 Initial double-precision acceptance thresholds (freeze them with fixtures before
