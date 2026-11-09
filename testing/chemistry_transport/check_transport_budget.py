@@ -14,6 +14,10 @@ t is the model time since the start of the run, refresh the model time of the
 PBL call that built the operator, dt the time step the tendency used.
 
 Checks on the PBL lines:
+  - every numeric field is finite (gfortran's MAX/MIN reductions drop NaN, so
+    a NaN may show only in the masses, the increment and rel);
+  - |after - before - increment| <= --max-rel * max(|before|, |after|): the
+    increment is summed column by column, independently of the two totals;
   - |rel| <= --max-rel and residual <= --max-residual (closed columns conserve);
   - with --expect-gases, every step has exactly that many gases, each once;
   - with --expect-steps, that many distinct steps appear;
@@ -30,6 +34,7 @@ Usage: check_transport_budget.py LOG [--expect-gases N] [--expect-steps N]
 """
 import argparse
 import json
+import math
 import re
 import sys
 from collections import defaultdict
@@ -41,6 +46,7 @@ LINE = re.compile(
     r"residual=(?P<residual>\S+) qmin=(?P<qmin>\S+) qmax=(?P<qmax>\S+) columns=(?P<columns>\d+) "
     r"refresh=(?P<refresh>\S+) dt=(?P<dt>\S+)")
 TIME_TOL = 1.0e-6   # [s]; model times are exact multiples of the step
+NUMERIC = ("t", "before", "after", "increment", "rel", "residual", "qmin", "qmax", "refresh", "dt")
 
 
 def parse(text):
@@ -78,6 +84,14 @@ def check(rows, args):
     for r in rows:
         by_step[r["t"]].append(r["gas"])
         where = f"t={r['t']:g} gas={r['gas']}"
+        bad = [k for k in NUMERIC if not math.isfinite(r[k])]
+        if bad:
+            failures.append(f"{where}: {', '.join(bad)} not finite")
+            continue
+        scale = max(abs(r["before"]), abs(r["after"]))
+        if abs(r["after"] - r["before"] - r["increment"]) > args.max_rel * scale:
+            failures.append(f"{where}: after - before = {r['after'] - r['before']:.6e} differs from the "
+                            f"increment {r['increment']:.6e}")
         if abs(r["rel"]) > args.max_rel:
             failures.append(f"{where}: rel {r['rel']:.3e} exceeds {args.max_rel:g}")
         if r["residual"] > args.max_residual:

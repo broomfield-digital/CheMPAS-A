@@ -7,11 +7,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import check_transport_budget as ctb  # noqa: E402
 
 
-def line(t, gas, rel=1.0e-16, residual=1.0e-16, refresh=None, dt=3.0, columns=28080, qmin=0.0):
+def fmt(x):
+    """A value as the model writes it: es25.16e3, or a string such as gfortran's 'NaN' or 'Infinity'."""
+    return x if isinstance(x, str) else f"{x:.16E}"
+
+
+def line(t, gas, rel=1.0e-16, residual=1.0e-16, refresh=None, dt=3.0, columns=28080, qmin=0.0,
+         before=1.0e6, after=1.0e6, increment=1.0e-10, qmax=1.0e-8):
     refresh = t if refresh is None else refresh
-    return (f" [transport] budget PBL t={t:.16E} gas={gas} scalar={10 + gas} before=1.0E+06 after=1.0E+06 "
-            f"increment=1.0E-10 rel={rel:.16E} residual={residual:.16E} qmin={qmin:.16E} qmax=1.0E-08 "
-            f"columns={columns} refresh={refresh:.16E} dt={dt:.16E}")
+    return (f" [transport] budget PBL t={fmt(t)} gas={gas} scalar={10 + gas} before={fmt(before)} "
+            f"after={fmt(after)} increment={fmt(increment)} rel={fmt(rel)} residual={fmt(residual)} "
+            f"qmin={fmt(qmin)} qmax={fmt(qmax)} columns={columns} refresh={fmt(refresh)} dt={fmt(dt)}")
 
 
 def log(steps=3, gases=3, interval=3.0, dt=3.0, **override):
@@ -82,6 +88,39 @@ def test_held_operator_within_its_interval_passes():
 def test_wrong_dt_fails():
     failures, _ = run(log(dt=3.0), "--dt", "6")
     assert any("dt" in f for f in failures), failures
+
+
+def test_nan_budget_fails():
+    # gfortran's MAX/MIN drop NaN, so the reduced residual and qmin can look clean while the masses are NaN
+    text = log() + line(6.0, 1, after="NaN", increment="NaN", rel="NaN", residual="NaN", qmin="NaN", refresh=6.0) + "\n"
+    failures, _ = run(text, "--dt", "3", "--interval", "3", "--min-q", "0")
+    assert any("not finite" in f for f in failures), failures
+
+
+def test_nan_mass_with_clean_rel_fails():
+    text = log() + line(6.0, 1, before="NaN", refresh=6.0) + "\n"
+    failures, _ = run(text)
+    assert any("before" in f and "not finite" in f for f in failures), failures
+
+
+def test_infinite_qmax_fails():
+    text = log() + line(6.0, 1, qmax="Infinity", refresh=6.0) + "\n"
+    failures, _ = run(text)
+    assert any("qmax" in f and "not finite" in f for f in failures), failures
+
+
+def test_increment_inconsistent_with_masses_fails():
+    # the increment is summed column by column, independently of the two totals
+    text = log() + line(6.0, 1, before=1.0e6, after=1.0e6 + 1.0e-3, increment=0.0, rel=0.0, refresh=6.0) + "\n"
+    failures, _ = run(text)
+    assert any("after - before" in f for f in failures), failures
+
+
+def test_absent_gas_passes():
+    # before lightning starts, NO is zero everywhere: before = after = increment = 0
+    text = log() + line(6.0, 1, before=0.0, after=0.0, increment=0.0, rel=0.0, qmax=0.0, refresh=6.0) + "\n"
+    failures, _ = run(text)
+    assert failures == [], failures
 
 
 def test_no_lines_fails():
