@@ -46,14 +46,14 @@ The model log then reports, during initialization:
 | Build | `MUSICA=true`, double precision, GNU Fortran; one OpenMP thread |
 | PBL scheme | `bl_ysu` (with or without `config_ysu_pblmix`), `bl_mynn` (local diffusion; updrafts; updrafts and downdrafts), or `off` (no transport) |
 | Surface layer | Required with an active PBL scheme (MPAS's own rule) |
-| `config_pbl_interval` | Any. Between PBL calls the last operator is applied every step |
+| `config_pbl_interval` | `'none'`, or at least `config_dt` (3, 6, 9 and 10 s tested with 3-s steps). Between PBL calls the last operator is applied every step. A shorter interval is not supported: MPAS then runs the PBL and surface schemes every step with the shorter interval as their time step |
 | `config_convection_scheme` | `'off'` only (convection-resolving configurations) |
 | `config_chemistry_interval` | Any |
-| Restart | Supported; the operator is rebuilt at the restart's first step |
+| Restart | Supported; the operator is rebuilt at the restart's first step. A restart on a PBL-interval boundary continues bitwise. Off a boundary, the PBL calls shift to the restart time, as the meteorology's do |
 | MPI | Any rank count |
 
-The qualification ran the idealized supercell on eight ranks with GNU Fortran
-(`testing/chemistry_transport/run_pbl_qualification.sh`). A Clang/Flang build
+The qualification (`testing/chemistry_transport/run_pbl_qualification.sh`) runs
+the idealized supercell on eight ranks with GNU Fortran. A Clang/Flang build
 has not been qualified yet.
 
 ## What stops the model
@@ -86,8 +86,11 @@ and model step to `log.atmosphere.0000.out`, reduced over all ranks:
 ```
 
 Each line is written on one line in the log. The masses are dry-air weighted
-totals. `rel` and `residual` should be at round-off (about 1e-15); `refresh` is
-the model time of the PBL call whose operator was applied. Check a log with:
+totals. `t` and `refresh` are seconds since this run's start, so they count
+from the restart time in a restarted run. `refresh` is the time of the PBL call
+whose operator was applied. `rel` and `residual` should be at round-off (about
+1e-15). The checker below also fails any value that is not finite, and any
+increment that does not match `after - before`. Check a log with:
 
 ```bash
 python testing/chemistry_transport/check_transport_budget.py log.atmosphere.0000.out --dt 3 --interval 3

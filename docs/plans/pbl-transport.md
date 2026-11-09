@@ -8,9 +8,10 @@ MYNN gas transport with its local diffusion, updrafts and downdrafts (see
 intervals, restart, chemistry intervals, MPI and the gate against parameterized
 convection (see the [P5 plan](#p5-plan-pbl-intervals-restart-and-mpi)), and P6,
 the GNU Fortran eight-rank qualification (see
-[P6](#p6-gnu-fortran-eight-rank-qualification-implemented)). The work is complete
+[P6](#p6-gnu-fortran-eight-rank-qualification-implemented)). The work completes
 for convection-resolving configurations, with parameterized convection off, the
-first science target being the resolved supercell. Qualification with
+first science target being the resolved supercell, when the final qualification
+run is recorded in P6. Qualification with
 parameterized convection belongs to the convective transport plan (#41); the
 Clang/Flang build is deferred. Users start from the
 [user guide](../chempas/guides/pbl-gas-transport.md).
@@ -1162,10 +1163,10 @@ precision without OpenMP, on eight ranks.
 | Setting | Supported | Stops at initialization |
 | --- | --- | --- |
 | PBL scheme | `bl_ysu`, with or without `config_ysu_pblmix`; `bl_mynn` with local diffusion, with updrafts (`config_mynn_edmf = 1`), and with updrafts and downdrafts (`config_mynn_edmf_dd = 1`); `off` (zero transport) | any other scheme |
-| `config_pbl_interval` | any; the operator from the last PBL call is applied every step | — |
+| `config_pbl_interval` | `'none'` or at least `config_dt` (3, 6, 9 and 10 s tested with 3-s steps); the operator from the last PBL call is applied every step. Shorter intervals are not supported: MPAS then integrates the PBL and surface schemes every step with the shorter interval | — |
 | `config_convection_scheme` | `'off'` | any other, including the Grell-Freitas of `convection_permitting` (#41) |
 | `config_chemistry_interval` | any (3, 9 and 21 s tested) | — |
-| Restart | yes; the operator is rebuilt at the restart's first step | — |
+| Restart | yes; the operator is rebuilt at the restart's first step; bitwise on a PBL-interval boundary | — |
 | MPI | any rank count (1, 2, 4 and 8 tested) | — |
 | OpenMP | one thread | more than one thread |
 | Toolchain | GNU Fortran; Clang/Flang not qualified | — |
