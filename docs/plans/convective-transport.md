@@ -179,6 +179,16 @@ data. Coordinate this with the PBL cache without changing chemistry cadence.
   qualification, including inactive transitions and no active columns on a rank.
 - [ ] C6: coupled PBL/convection/MICM runs, GCC/gfortran and Clang/Flang eight-rank
   NetCDF results, supported configurations, and reproducible result manifest.
+  C6 also lifts the PBL plan's convection gate (see below).
+
+Since 2026-11-08 the PBL plan (#40) completes without this branch, for
+convection-resolving configurations with parameterized convection off. Its
+first science target is the resolved supercell. Until this plan's coupled
+qualification passes, gas PBL transport stops at initialization when any
+convection scheme is active, including Grell-Freitas in the
+`convection_permitting` suite (PBL plan, P5 Task 7). The coupled PBL +
+parameterized convection + MICM qualification is owned here, in C6, which
+removes that gate when it passes.
 
 Likely changes are in `Registry.xml`, the shared physics helper, convection
 driver/from/to/expiry routines, `mpas_atmphys_todynamics.F`, physics manager,
