@@ -1,0 +1,16 @@
+PASS MANIFEST lists the YSU and the two MYNN targets
+PASS pristine files are patched
+PASS patched files have the recorded hashes
+PASS YSU export argument is present
+PASS MYNN plume export arguments are present
+PASS second application is a no-op
+PASS revert succeeds
+PASS revert restores the pinned files
+PASS revert leaves the external clean for checkout_externals
+PASS reverting the pinned files is a no-op
+PASS applying after a revert patches again
+PASS re-applied files keep their earlier modification times
+PASS no state files are left in the external
+PASS revert refuses a file with other edits
+PASS a file with other edits is refused
+test_apply_mmm_patches: PASS

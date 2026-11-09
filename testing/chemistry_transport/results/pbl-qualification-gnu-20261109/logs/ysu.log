@@ -1,0 +1,54 @@
+/home/fillmore/Data/CheMPAS-A/p6-dev/qual2/ysu/stable_init.nc: gas profiles with vertical structure; baseline surface
+/home/fillmore/Data/CheMPAS-A/p6-dev/qual2/ysu/convective_init.nc: gas profiles with vertical structure; skintemp = sst = 305.0 K
+== gate cases
+PASS interval-runs: YSU gas transport runs at a nondefault PBL interval (P5; check_pbl_intervals.sh)
+PASS gate-convection: the model stopped with 'parameterized convection does not transport MICM gases yet (#41)'
+PASS gate-no-sfclayer: the model stopped with 'wrong choice for surface layer scheme with YSU PBL'
+PASS gate-pbl-off: runs; PBL gas transport logged as not enabled
+== YSU runs (300 s, output every 60 s)
+== stable surface layer
+PASS same output times (6 records)
+PASS non-gas fields bitwise identical with and without gas transport (differing: none)
+PASS hpbl > 0 in every column after the initial record (min 149.7 m)
+PASS qNO finite and nonnegative to roundoff at every record with transport (0 violations)
+PASS qNO2 finite and nonnegative to roundoff at every record with transport (0 violations)
+PASS qO3 finite and nonnegative to roundoff at every record with transport (0 violations)
+PASS qNO domain mass conserved with transport (max drift 4.05e-16)
+PASS qNO2 domain mass conserved with transport (max drift 3.78e-16)
+PASS qO3 domain mass conserved with transport (max drift 0.00e+00)
+PASS qNO: mixed down-gradient (domain fraction of column variance mixed out 4.930e-04; 28080/28080 columns reduced)
+PASS qNO2: mixed down-gradient (domain fraction of column variance mixed out 4.501e-05; 28047/28080 columns reduced)
+PASS qO3: mixed down-gradient (domain fraction of column variance mixed out 2.922e-05; 28080/28080 columns reduced)
+== convective surface layer
+PASS same output times (6 records)
+PASS non-gas fields bitwise identical with and without gas transport (differing: none)
+PASS hpbl > 0 in every column after the initial record (min 430.8 m)
+PASS qNO finite and nonnegative to roundoff at every record with transport (0 violations)
+PASS qNO2 finite and nonnegative to roundoff at every record with transport (0 violations)
+PASS qO3 finite and nonnegative to roundoff at every record with transport (0 violations)
+PASS qNO domain mass conserved with transport (max drift 0.00e+00)
+PASS qNO2 domain mass conserved with transport (max drift 1.89e-16)
+PASS qO3 domain mass conserved with transport (max drift 1.70e-16)
+PASS qNO: mixed down-gradient (domain fraction of column variance mixed out 1.244e-01; 28080/28080 columns reduced)
+PASS qNO2: mixed down-gradient (domain fraction of column variance mixed out 3.845e-05; 28046/28080 columns reduced)
+PASS qO3: mixed down-gradient (domain fraction of column variance mixed out 1.594e-03; 28080/28080 columns reduced)
+PASS qNO: convective-on mixes more than stable-on (1.244e-01 > 4.930e-04)
+PASS qO3: convective-on mixes more than stable-on (1.594e-03 > 2.922e-05)
+== convective, top-down mixing on (config_ysu_pblmix)
+PASS same output times (6 records)
+PASS non-gas fields bitwise identical with and without gas transport (differing: none)
+PASS hpbl > 0 in every column after the initial record (min 430.8 m)
+PASS qNO finite and nonnegative to roundoff at every record with transport (0 violations)
+PASS qNO2 finite and nonnegative to roundoff at every record with transport (0 violations)
+PASS qO3 finite and nonnegative to roundoff at every record with transport (0 violations)
+PASS qNO domain mass conserved with transport (max drift 0.00e+00)
+PASS qNO2 domain mass conserved with transport (max drift 3.78e-16)
+PASS qO3 domain mass conserved with transport (max drift 0.00e+00)
+PASS qNO: mixed down-gradient (domain fraction of column variance mixed out 1.244e-01; 28080/28080 columns reduced)
+PASS qNO2: mixed down-gradient (domain fraction of column variance mixed out 3.845e-05; 28046/28080 columns reduced)
+PASS qO3: mixed down-gradient (domain fraction of column variance mixed out 1.594e-03; 28080/28080 columns reduced)
+== transport off is unchanged from the pre-P3 executable
+PASS same output times (6 records)
+PASS same output variables (unmatched: none)
+PASS every common output field bitwise identical (differing: none)
+PASS: YSU gas PBL qualification

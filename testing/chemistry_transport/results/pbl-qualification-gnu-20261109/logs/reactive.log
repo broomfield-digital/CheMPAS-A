@@ -1,0 +1,29 @@
+/home/fillmore/Data/CheMPAS-A/p6-dev/qual2/reactive/stable_init.nc: gas profiles with vertical structure; baseline surface
+/home/fillmore/Data/CheMPAS-A/p6-dev/qual2/reactive/convective_init.nc: gas profiles with vertical structure; skintemp = sst = 305.0 K
+== nolightning-ysu
+PASS record 0000-01-01_18:05:00 and fields present (missing: none)
+PASS 22 fields at 0000-01-01_18:05:00 agree (bitwise); differing: none
+PASS invariant N: largest relative drift 1.621e-16 (limit 1e-12) over 6 records
+PASS invariant Ox: largest relative drift 1.304e-16 (limit 1e-12) over 6 records
+PASS qNO: 0 values non-finite or below the floor
+PASS qNO2: 0 values non-finite or below the floor
+PASS qO3: 0 values non-finite or below the floor
+PASS: transport budget, 300 lines over 100 steps, max |rel| 7.29e-16, max column residual 2.92e-15
+== nolightning-mynn
+PASS record 0000-01-01_18:05:00 and fields present (missing: none)
+PASS 24 fields at 0000-01-01_18:05:00 agree (bitwise); differing: none
+PASS invariant N: largest relative drift 4.864e-16 (limit 1e-12) over 6 records
+PASS invariant Ox: largest relative drift 1.304e-16 (limit 1e-12) over 6 records
+PASS qNO: 0 values non-finite or below the floor
+PASS qNO2: 0 values non-finite or below the floor
+PASS qO3: 0 values non-finite or below the floor
+PASS: transport budget, 300 lines over 100 steps, max |rel| 1.73e-16, max column residual 1.45e-15
+== lightning-ysu
+PASS record 0000-01-01_18:30:00 and fields present (missing: none)
+PASS 22 fields at 0000-01-01_18:30:00 agree (bitwise); differing: none
+PASS invariant Ox: largest relative drift 1.207e-16 (limit 1e-12) over 4 records
+PASS qNO: 0 values non-finite or below the floor
+PASS qNO2: 0 values non-finite or below the floor
+PASS qO3: 0 values non-finite or below the floor
+PASS: transport budget, 1800 lines over 600 steps, max |rel| 1.94e-16, max column residual 1.13e-15
+PASS: reactive regression with PBL transport

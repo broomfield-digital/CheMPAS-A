@@ -1,0 +1,38 @@
+/home/fillmore/Data/CheMPAS-A/p6-dev/qual2/restart/stable_init.nc: gas profiles with vertical structure; baseline surface
+/home/fillmore/Data/CheMPAS-A/p6-dev/qual2/restart/convective_init.nc: gas profiles with vertical structure; skintemp = sst = 305.0 K
+== continuous runs
+== restarted runs
+== ysu-none: restarted against continuous at 0000-01-01_18:02:24
+PASS record 0000-01-01_18:02:24 and fields present (missing: none)
+PASS 25 fields at 0000-01-01_18:02:24 agree (bitwise); differing: none
+== ysu-9: restarted against continuous at 0000-01-01_18:02:24
+PASS record 0000-01-01_18:02:24 and fields present (missing: none)
+PASS 25 fields at 0000-01-01_18:02:24 agree (bitwise); differing: none
+== mynn-none: restarted against continuous at 0000-01-01_18:02:24
+PASS record 0000-01-01_18:02:24 and fields present (missing: none)
+PASS 27 fields at 0000-01-01_18:02:24 agree (bitwise); differing: none
+== mynn-9: restarted against continuous at 0000-01-01_18:02:24
+PASS record 0000-01-01_18:02:24 and fields present (missing: none)
+PASS 27 fields at 0000-01-01_18:02:24 agree (bitwise); differing: none
+== native-ysu-none: restarted against continuous at 0000-01-01_18:02:24
+PASS record 0000-01-01_18:02:24 and fields present (missing: none)
+PASS 25 fields at 0000-01-01_18:02:24 agree (bitwise); differing: none
+== ysu-9-offb: restarted off the 9-s boundary, at 60 s (reported only)
+  hfx: 28080 of 28080 outside; max |diff| 1.270e-01, max rel 2.465e-03
+  hpbl: 27768 of 28080 outside; max |diff| 2.087e+00, max rel 3.158e-03
+  kzh: 1261869 of 1684800 outside; max |diff| 2.089e+00, max rel 1.191e-01
+  pressure: 1669857 of 1684800 outside; max |diff| 4.163e-03, max rel 5.148e-08
+  qNO: 1488238 of 1684800 outside; max |diff| 2.942e-16, max rel 3.273e-05
+  qNO2: 1498636 of 1684800 outside; max |diff| 1.255e-15, max rel 2.669e-05
+  qO3: 1508210 of 1684800 outside; max |diff| 1.530e-13, max rel 2.257e-06
+  qv: 1666260 of 1684800 outside; max |diff| 4.119e-08, max rel 4.856e-06
+  rho: 1673918 of 1684800 outside; max |diff| 5.787e-08, max rel 6.088e-08
+  rho_zz: 1673918 of 1684800 outside; max |diff| 5.787e-08, max rel 6.088e-08
+  theta: 1670156 of 1684800 outside; max |diff| 1.173e-05, max rel 3.832e-08
+  u: 5049774 of 5054400 outside; max |diff| 2.751e-05, max rel 4.535e+02
+  ust: 27768 of 28080 outside; max |diff| 5.303e-04, max rel 2.442e-03
+  w: 1656720 of 1712880 outside; max |diff| 1.746e-05, max rel 9.150e+00
+PASS record 0000-01-01_18:02:00 and fields present (missing: none)
+FAIL 25 fields at 0000-01-01_18:02:00 agree (bitwise); differing: ['hfx', 'hpbl', 'kzh', 'pressure', 'qNO', 'qNO2', 'qO3', 'qv', 'rho', 'rho_zz', 'theta', 'u', 'ust', 'w']
+NOTE ysu-9-offb differs, as expected when the PBL cadence shifts; see /home/fillmore/Data/CheMPAS-A/p6-dev/qual2/restart/ysu-9-offb.json
+PASS: restart

@@ -1,0 +1,115 @@
+{
+ "status": "pass",
+ "case": "MICM gas PBL transport qualification (docs/plans/pbl-transport.md, P5-P6)",
+ "date_utc_start": "2026-11-09T06:37:06Z",
+ "host": "Orion",
+ "run_root": "/home/fillmore/Data/CheMPAS-A/p6-dev/qual2",
+ "source": {
+  "revision": "bf3f1abfb3edd20b78b5d7cf396dcaf24db44fd7",
+  "branch": "chempas-a-pbl-complete",
+  "tracked_changes": ""
+ },
+ "executables": {
+  "model": {
+   "path": "/home/fillmore/Data/CheMPAS-A/p6-dev/qual2/executables/atmosphere_model",
+   "sha256": "2eaacb4753ea5dbc617c42b65cc2945eec04b31483b3c8094f1f491e00d7c34d"
+  },
+  "pre_p3": {
+   "path": "/home/fillmore/Data/CheMPAS-A/p6-dev/qual2/executables/pre_p3-atmosphere_model",
+   "sha256": "2d34e9c905a348f6119e988cf769f96f4ef425c156b0180e9eccc9ae87cca706"
+  },
+  "pre_p4": {
+   "path": "/home/fillmore/Data/CheMPAS-A/p6-dev/qual2/executables/pre_p4-atmosphere_model",
+   "sha256": "9e69a9ad341beb5e40f7a910dd2778d38cb20a390b314f74c398ac7f00498e1e"
+  },
+  "pre_p5": {
+   "path": "/home/fillmore/Data/CheMPAS-A/p6-dev/qual2/executables/pre_p5-atmosphere_model",
+   "sha256": "4d959f0189711af039bb2d1221c6d54577f468f5bb7c2577d052043f00982282"
+  }
+ },
+ "model_copied_from": {
+  "path": "/home/fillmore/BroomfieldDigital/CheMPAS-A/atmosphere_model",
+  "sha256": "2eaacb4753ea5dbc617c42b65cc2945eec04b31483b3c8094f1f491e00d7c34d"
+ },
+ "toolchain": {
+  "platform": "Linux x86_64",
+  "compiler": "GNU Fortran (conda-forge gcc 15.2.0-19) 15.2.0",
+  "mpi": "mpirun (Open MPI) 5.0.10",
+  "netcdf_c": "netCDF 4.10.1",
+  "netcdf_fortran": "4.6.3",
+  "musica_prefix": "/home/fillmore/software/musica-1403e3d22717bc87f3bf9d0aa591caf039c92bbc"
+ },
+ "baseline": {
+  "directory": "/home/fillmore/Data/CheMPAS-A/baselines/supercell_lnox/20261107T201901Z-2c6ff111",
+  "supercell_init_sha256": "b79a002abe68fce03deacb4b4ca730e7bb3d909242ac3815641ea9cb12cc5999",
+  "chemistry": {
+   "musica_fortran": "0.16.5",
+   "musica_revision": "1403e3d22717bc87f3bf9d0aa591caf039c92bbc",
+   "micm_revision": "bb57684a2047f0e58f30b199366294af879e8597",
+   "miem_revision": "9fdf14a189262eecb677862d877ab72b06c95e21",
+   "mechanism_configuration_revision": "82c159ae6d74934318ffd6c405a45c2159065b12",
+   "tuvx_revision": "bbf7dd9a144fa0f0294b3779f3f993818638e20c",
+   "miem_compiled": true,
+   "miem_active": false,
+   "mechanism": "micm_configs/lnox_o3.yaml",
+   "initial_NO_ppbv": 0,
+   "initial_NO2_ppbv": 0,
+   "chemistry_interval_seconds": 3,
+   "photolysis_interval_seconds": 600,
+   "photolysis_latitude_degrees": 35.86,
+   "photolysis_longitude_degrees": -97.93,
+   "lnox_gating": "altitude",
+   "lnox_source_rate_ppbv_s": 0.5,
+   "lnox_w_threshold_m_s": 5,
+   "lnox_w_ref_m_s": 10,
+   "lnox_height_range_m": [
+    5000,
+    12000
+   ],
+   "initial_O3_nominal_ppbv": 50,
+   "initial_O3_kg_kg": 8.275862068965518e-08,
+   "initializer_dry_air_molar_mass_kg_mol": 0.029,
+   "host_dry_air_molar_mass_kg_mol": 0.0289644,
+   "initial_O3_host_ppbv": 49.93862068965518
+  },
+  "toolchain": {
+   "platform": "Linux x86_64",
+   "compiler": "GNU Fortran 15.2.0",
+   "mpi": "Open MPI 5.0.10",
+   "netcdf_c": "4.10.1",
+   "netcdf_fortran": "4.6.3",
+   "pnetcdf": "1.14.1",
+   "pio": "2.6.9",
+   "precision": "double",
+   "openmp": false
+  }
+ },
+ "fine_grid": {
+  "directory": "/home/fillmore/Data/CheMPAS-A/p6-dev/fine-grid",
+  "inputs_sha256": {
+   "convective_init.nc": "e3b85b340fa210e4596afd6d5b818dedc4a3f0420c363a2975932086f291785f",
+   "stable_init.nc": "ab92af16c9d16655857d6f2da9be65130b9135550d4ed17beb052cf40174e2b9",
+   "supercell_zeta_levels.txt": "f88765536f7e63b47d4eb56fdaf21b894cd461e5d9102568cf29c1dc34541f00",
+   "prepared_at_revision": "f62f5423a37e68a082a03fdfc45d2d4c43181350"
+  }
+ },
+ "date_utc_end": "2026-11-09T10:29:31Z",
+ "provenance_drift": [],
+ "checks": {
+  "python-unit": "PASS",
+  "fortran-unit": "PASS",
+  "mmm-patches": "PASS",
+  "wiring": "PASS",
+  "realized-increment": "PASS",
+  "ysu": "PASS",
+  "mynn": "PASS",
+  "cadence": "PASS",
+  "intervals": "PASS",
+  "restart": "PASS",
+  "chemistry-intervals": "PASS",
+  "mpi": "PASS",
+  "reactive": "PASS",
+  "fine-grid": "PASS",
+  "smoke-60s": "PASS"
+ }
+}

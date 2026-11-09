@@ -1,0 +1,41 @@
+== build with the PBL gas test double
+== resting initial state and inert mechanism
+reference cell 1569 at (5.1, 5.1) km; dry base state at rest; uniform fields: qv, qAB, qA, qB, tke, w, dz, dzs, zs, sh2o, smois, tslb, tmn, skintemp, sst, snow, snowc, snowh, xice, seaice, vegfra, sfc_albbck, xland, rho, theta, relhum, rho_base, theta_base, surface_pressure, precipw, h_oml_initial, u10, v10, q2, rh2, t2m, qNO, qNO2, qO3
+== realized increments
+PASS rest-mono-source: 3 steps, max|realized-requested| 5.950e-23, column-mass budget error 3.420e-16, max|w| 4.23e-14, max|u| 0.00e+00
+PASS rest-mono-diffusion: 3 steps, max|realized-requested| 5.294e-23, column-mass budget error 2.360e-16, max|w| 4.23e-14, max|u| 0.00e+00
+PASS rest-ordinary-source: 3 steps, max|realized-requested| 5.950e-23, column-mass budget error 3.420e-16, max|w| 4.23e-14, max|u| 0.00e+00
+PASS rest-ordinary-diffusion: 3 steps, max|realized-requested| 5.294e-23, column-mass budget error 2.777e-16, max|w| 4.23e-14, max|u| 0.00e+00
+PASS rest-posdef-source: 3 steps, max|realized-requested| 5.950e-23, column-mass budget error 3.420e-16, max|w| 4.23e-14, max|u| 0.00e+00
+PASS rest-posdef-diffusion: 3 steps, max|realized-requested| 5.294e-23, column-mass budget error 2.360e-16, max|w| 4.23e-14, max|u| 0.00e+00
+PASS rest-mono_split-source: 3 steps, max|realized-requested| 3.891e-23, column-mass budget error 3.420e-16, max|w| 2.07e-14, max|u| 0.00e+00
+PASS rest-mono_split-diffusion: 3 steps, max|realized-requested| 5.294e-23, column-mass budget error 2.082e-16, max|w| 2.07e-14, max|u| 0.00e+00
+PASS rest-ordinary_split-source: 3 steps, max|realized-requested| 5.950e-23, column-mass budget error 3.420e-16, max|w| 2.07e-14, max|u| 0.00e+00
+PASS rest-ordinary_split-diffusion: 3 steps, max|realized-requested| 5.294e-23, column-mass budget error 2.777e-16, max|w| 2.07e-14, max|u| 0.00e+00
+PASS rest-mono_chem2-source: 3 steps, max|realized-requested| 3.587e-23, column-mass budget error 3.420e-16, max|w| 4.23e-14, max|u| 0.00e+00
+PASS rest-mono_chem2-diffusion: 3 steps, max|realized-requested| 3.970e-23, column-mass budget error 2.360e-16, max|w| 4.23e-14, max|u| 0.00e+00
+PASS rest-mono_chem3-source: 8 steps, max|realized-requested| 3.917e-23, column-mass budget error 4.820e-16, max|w| 1.46e-13, max|u| 0.00e+00
+PASS rest-mono_chem3-diffusion: 8 steps, max|realized-requested| 5.294e-23, column-mass budget error 2.777e-16, max|w| 1.46e-13, max|u| 0.00e+00
+PASS rest-mono_chem7-source: 8 steps, max|realized-requested| 3.917e-23, column-mass budget error 4.820e-16, max|w| 1.46e-13, max|u| 0.00e+00
+PASS rest-mono_chem7-diffusion: 8 steps, max|realized-requested| 5.294e-23, column-mass budget error 2.777e-16, max|w| 1.46e-13, max|u| 0.00e+00
+PASS rest-mono-off: 3 steps, max|realized-requested| 2.647e-23, column-mass budget error 1.388e-16, max|w| 4.23e-14, max|u| 0.00e+00
+PASS moving-mono-source: 3 steps, column budget only, column-mass budget error 3.125e-16, max|w| 4.26e-03, max|u| 3.51e-02
+PASS moving-mono-diffusion: 3 steps, column budget only, column-mass budget error 4.164e-16, max|w| 4.26e-03, max|u| 3.51e-02
+PASS moving-ordinary-source: 3 steps, column budget only, column-mass budget error 2.714e-16, max|w| 4.26e-03, max|u| 3.51e-02
+PASS moving-ordinary-diffusion: 3 steps, column budget only, column-mass budget error 2.082e-16, max|w| 4.26e-03, max|u| 3.51e-02
+PASS moving-posdef-source: 3 steps, column budget only, column-mass budget error 3.125e-16, max|w| 4.26e-03, max|u| 3.51e-02
+PASS moving-posdef-diffusion: 3 steps, column budget only, column-mass budget error 4.164e-16, max|w| 4.26e-03, max|u| 3.51e-02
+PASS moving-mono_split-source: 3 steps, column budget only, column-mass budget error 2.287e-16, max|w| 4.33e-03, max|u| 3.51e-02
+PASS moving-mono_split-diffusion: 3 steps, column budget only, column-mass budget error 2.360e-16, max|w| 4.33e-03, max|u| 3.51e-02
+PASS moving-ordinary_split-source: 3 steps, column budget only, column-mass budget error 2.933e-16, max|w| 4.33e-03, max|u| 3.51e-02
+PASS moving-ordinary_split-diffusion: 3 steps, column budget only, column-mass budget error 4.164e-16, max|w| 4.33e-03, max|u| 3.51e-02
+PASS moving-mono_chem2-source: 3 steps, column budget only, column-mass budget error 3.125e-16, max|w| 4.26e-03, max|u| 3.51e-02
+PASS moving-mono_chem2-diffusion: 3 steps, column budget only, column-mass budget error 4.164e-16, max|w| 4.26e-03, max|u| 3.51e-02
+PASS moving-mono_chem3-source: 8 steps, column budget only, column-mass budget error 3.125e-16, max|w| 4.84e-03, max|u| 9.21e-02
+PASS moving-mono_chem3-diffusion: 8 steps, column budget only, column-mass budget error 6.246e-16, max|w| 4.84e-03, max|u| 9.21e-02
+PASS moving-mono_chem7-source: 8 steps, column budget only, column-mass budget error 3.125e-16, max|w| 4.84e-03, max|u| 9.21e-02
+PASS moving-mono_chem7-diffusion: 8 steps, column budget only, column-mass budget error 6.246e-16, max|w| 4.84e-03, max|u| 9.21e-02
+PASS moving-mono-off: 3 steps, column budget only, column-mass budget error 2.360e-16, max|w| 4.26e-03, max|u| 3.51e-02
+PASS fresh-mono-diffusion: first step uses the post-chemistry state (excess over tolerance -1.00e-18; a stale tendency would exceed it by 1.31e-13)
+PASS fresh-ordinary-diffusion: first step uses the post-chemistry state (excess over tolerance -1.00e-18; a stale tendency would exceed it by 1.31e-13)
+PASS: realized increments match requested increments in every advection mode

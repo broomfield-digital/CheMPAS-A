@@ -1,0 +1,27 @@
+/home/fillmore/Data/CheMPAS-A/p6-dev/qual2/mpi/stable_init.nc: gas profiles with vertical structure; baseline surface
+/home/fillmore/Data/CheMPAS-A/p6-dev/qual2/mpi/convective_init.nc: gas profiles with vertical structure; skintemp = sst = 305.0 K
+== ysu: 1 ranks against 8
+PASS record 0000-01-01_18:01:00 and fields present (missing: none)
+PASS 3 fields at 0000-01-01_18:01:00 agree (atol=1e-18, rtol=1e-10); differing: none
+NOTE every output field is bitwise identical
+== ysu: 2 ranks against 8
+PASS record 0000-01-01_18:01:00 and fields present (missing: none)
+PASS 3 fields at 0000-01-01_18:01:00 agree (atol=1e-18, rtol=1e-10); differing: none
+NOTE every output field is bitwise identical
+== ysu: 4 ranks against 8
+PASS record 0000-01-01_18:01:00 and fields present (missing: none)
+PASS 3 fields at 0000-01-01_18:01:00 agree (atol=1e-18, rtol=1e-10); differing: none
+NOTE every output field is bitwise identical
+== mynn: 1 ranks against 8
+PASS record 0000-01-01_18:01:00 and fields present (missing: none)
+PASS 3 fields at 0000-01-01_18:01:00 agree (atol=1e-18, rtol=1e-10); differing: none
+NOTE every output field is bitwise identical
+== mynn: 2 ranks against 8
+PASS record 0000-01-01_18:01:00 and fields present (missing: none)
+PASS 3 fields at 0000-01-01_18:01:00 agree (atol=1e-18, rtol=1e-10); differing: none
+NOTE every output field is bitwise identical
+== mynn: 4 ranks against 8
+PASS record 0000-01-01_18:01:00 and fields present (missing: none)
+PASS 3 fields at 0000-01-01_18:01:00 agree (atol=1e-18, rtol=1e-10); differing: none
+NOTE every output field is bitwise identical
+PASS: decomposition

@@ -1,0 +1,365 @@
+PASS stable: MYNN succeeds
+PASS stable: exch_h is zero at the surface face and nonnegative
+PASS stable: MYNN exchange builds a valid operator
+stable: worst relative difference from MYNN's scalar mixing =  2.443E-16
+PASS stable: exch_h reproduces MYNN's own scalar mixing
+PASS stable: MYNN mixes the aerosol profile
+PASS stable: dry mass of every gas is conserved
+PASS stable: a zero gas stays zero
+PASS stable: the surface-confined gas is mixed upward
+PASS stable: a uniform gas is unchanged
+PASS convective: MYNN succeeds
+PASS convective: exch_h is zero at the surface face and nonnegative
+PASS convective: MYNN exchange builds a valid operator
+convective: worst relative difference from MYNN's scalar mixing =  2.554E-16
+PASS convective: exch_h reproduces MYNN's own scalar mixing
+PASS convective: MYNN mixes the aerosol profile
+PASS convective: dry mass of every gas is conserved
+PASS convective: a zero gas stays zero
+PASS convective: the surface-confined gas is mixed upward
+PASS convective: a uniform gas is unchanged
+PASS convective MYNN exchange exceeds the stable exchange
+PASS EDMF: MYNN succeeds and its plumes transport
+PASS EDMF: the exported plumes build a valid operator
+EDMF: substeps at the 30 s step = 1
+PASS EDMF: the column step is accepted
+PASS EDMF: dry mass of every gas is conserved
+PASS EDMF: every gas stays within its initial range
+PASS EDMF: a uniform gas is unchanged
+PASS EDMF: a zero gas stays zero
+EDMF: lift of the aerosol beyond local diffusion, gas operator / MYNN =  9.134E-01
+PASS EDMF: the plumes lift a surface-rich profile beyond local diffusion, as MYNN's own mixing does
+ qstar=   2.1498010866707033E-004  thstar=  0.17439590921473186       wst_dd=   2.0900916916578458     
+ F0=   926.43269779472416       wst_rad=   2.8439804599634062       jump_thv=   4.4718670568865679     
+ entrainment velocity=   7.5086430705928589E-002
+PASS downdrafts: MYNN succeeds and its downdrafts transport
+PASS downdrafts: the exported plumes build a valid operator
+downdrafts: substeps at the 30 s step = 1
+PASS downdrafts: every gas is conserved and within its range
+PASS downdrafts: a uniform gas is unchanged and a zero gas stays zero
+PASS downdrafts carry a gas confined to the cloud-top layer downward
+test_mynn_gas_operator: 32 of 32 checks passed
+== test_mynn_gas_operator: PASS
+PASS wrapper calls succeed
+PASS the updraft scheme transports
+worst relative difference of sum(rhoz*aw) from edmf_a*edmf_w =  2.363E-16
+PASS summed over plumes, rhoz*edmf_aw_up(k) is MYNN's updraft mass flux on the top face of layer k
+PASS the export is nonnegative and zero at the model top
+PASS mixing fractions lie in [0,1)
+PASS a mixing fraction is set only where the plume leaves the layer
+PASS level kme is not written
+PASS export absent: every other output is unchanged (bitwise)       
+PASS export unallocated: every other output is unchanged (bitwise)  
+PASS the cloud-topped column has a cooled cloud top inside the column
+PASS cloudy column without snow microphysics: repeated MYNN calls are identical (bitwise)
+ qstar=   2.1498010866707033E-004  thstar=  0.17439590921473186       wst_dd=   2.0900916916578458     
+ F0=   926.43269779472416       wst_rad=   2.8439804599634062       jump_thv=   4.4718670568865679     
+ entrainment velocity=   7.5086430705928589E-002
+ qstar=   2.1498010866707033E-004  thstar=  0.17439590921473186       wst_dd=   2.0900916916578458     
+ F0=   926.43269779472416       wst_rad=   2.8439804599634062       jump_thv=   4.4718670568865679     
+ entrainment velocity=   7.5086430705928589E-002
+ qstar=   2.1498010866707033E-004  thstar=  0.17439590921473186       wst_dd=   2.0900916916578458     
+ F0=   926.43269779472416       wst_rad=   2.8439804599634062       jump_thv=   4.4718670568865679     
+ entrainment velocity=   7.5086430705928589E-002
+PASS downdrafts: wrapper calls succeed
+PASS MYNN's downdrafts transport in the cloud-topped column
+PASS downdraft export is nonnegative, zero at the ground and above the cloud top
+PASS downdraft mixing fractions lie in [0,1)
+PASS a downdraft mixing fraction is set only where the downdraft passes through the layer
+PASS downdrafts: level kme is not written
+PASS downdraft export absent or unallocated: every other output is unchanged (bitwise)
+test_mynn_wrapper_export: 18 of 18 checks passed
+== test_mynn_wrapper_export: PASS
+PASS fixture directory is set (CHEMPAS_UNIT_COLUMNS)
+PASS nonuniform: reference fixture is readable
+PASS nonuniform: matches the exact dense solve
+PASS nonuniform: mass residual per call <= 1e-12
+PASS nonuniform: nonnegative, zero species stay exactly zero
+PASS nonuniform: maximum principle
+PASS nonuniform: species permutation is bitwise invariant
+PASS nonuniform: ground and top interfaces are closed
+PASS mass residual after 1000 calls <= 1e-10
+PASS pulses: reference fixture is readable
+PASS pulses: matches the exact dense solve
+PASS pulses: mass residual per call <= 1e-12
+PASS pulses: nonnegative, zero species stay exactly zero
+PASS pulses: maximum principle
+PASS pulses: species permutation is bitwise invariant
+PASS pulses: ground and top interfaces are closed
+PASS sharp_gradient: reference fixture is readable
+PASS sharp_gradient: matches the exact dense solve
+PASS sharp_gradient: mass residual per call <= 1e-12
+PASS sharp_gradient: nonnegative, zero species stay exactly zero
+PASS sharp_gradient: maximum principle
+PASS sharp_gradient: species permutation is bitwise invariant
+PASS sharp_gradient: ground and top interfaces are closed
+PASS zero_coefficients: reference fixture is readable
+PASS zero_coefficients: matches the exact dense solve
+PASS zero_coefficients: mass residual per call <= 1e-12
+PASS zero_coefficients: nonnegative, zero species stay exactly zero
+PASS zero_coefficients: maximum principle
+PASS zero_coefficients: species permutation is bitwise invariant
+PASS zero_coefficients: ground and top interfaces are closed
+PASS large_timestep: reference fixture is readable
+PASS large_timestep: matches the exact dense solve
+PASS large_timestep: mass residual per call <= 1e-12
+PASS large_timestep: nonnegative, zero species stay exactly zero
+PASS large_timestep: maximum principle
+PASS large_timestep: species permutation is bitwise invariant
+PASS large_timestep: ground and top interfaces are closed
+PASS uniform: reference fixture is readable
+PASS uniform: matches the exact dense solve
+PASS uniform: mass residual per call <= 1e-12
+PASS uniform: nonnegative, zero species stay exactly zero
+PASS uniform: maximum principle
+PASS uniform: species permutation is bitwise invariant
+PASS uniform: ground and top interfaces are closed
+PASS uniform profile is unchanged
+PASS extreme stiffness: mass residual per call <= 1e-12
+PASS extreme stiffness: nonnegative
+PASS extreme stiffness: mass residual after 1000 calls <= 1e-10
+PASS dt*G/m_d = 1e4: uniform profile is unchanged
+PASS dt*G/m_d = 1e4: maximum principle
+PASS dt*G/m_d = 1e6: uniform profile is unchanged
+PASS dt*G/m_d = 1e6: maximum principle
+PASS cosine modes decay at the analytic backward-Euler rate
+test_pbl_diffusion: 53 of 53 checks passed
+== test_pbl_diffusion: PASS
+PASS valid plumes are accepted
+PASS plume mass flux on face k+1 is the dry face density times aw(k); surface and top closed
+PASS entrainment is max(eps*M_in/(1-eps), M_out-M_in): detrainment >= 0; none where the plume ends
+PASS every plume is rooted in layer 1 (all of its flux entrained there)
+PASS the test column has an accelerating plume whose entrainment is raised
+plume layers where MYNN's fraction is mass-consistent: 97
+PASS rebuilt plume is MYNN's linear mixing where MYNN's fraction is mass-consistent
+PASS a step within the outgoing-mass bound takes one substep
+worst difference from the layer-budget form, relative to the column maximum =  3.309E-16
+PASS flux form equals the independent layer-budget form
+PASS a step of 2.5 times the outgoing-mass bound takes three substeps
+PASS every gas is conserved to roundoff
+PASS every gas stays within its initial range (nonnegative, no new extrema)
+PASS a zero gas stays exactly zero
+PASS the plumes carry a surface-confined gas upward
+PASS three substeps equal three steps of a third (bitwise)
+PASS a uniform gas is unchanged
+PASS conserved over 1,000 calls
+PASS a step beyond 1e4 times the outgoing-mass bound is rejected and leaves the gases unchanged
+PASS valid downdrafts are accepted
+PASS downdraft mass flux on face k is the dry face density times aw(k); surface and top closed
+downdraft layers where MYNN's fraction is mass-consistent: 31
+PASS downdrafts: rooted in their start layer, mass-consistent, MYNN's mixing where consistent
+PASS updrafts and downdrafts: a step within the outgoing-mass bound takes one substep
+updrafts and downdrafts: worst difference from the layer-budget form =  4.136E-16
+PASS updrafts and downdrafts: flux form equals the layer-budget form
+PASS updrafts and downdrafts: conserved, within range, a zero gas zero (three substeps)
+PASS updrafts and downdrafts: a uniform gas is unchanged
+PASS downdrafts alone carry an elevated gas downward and conserve it
+PASS a downdraft reaching the surface is rejected
+PASS negative downdraft aw is rejected
+PASS a downdraft entrainment fraction of 1 is rejected
+PASS negative aw is rejected
+PASS an entrainment fraction of 1 is rejected
+PASS a negative entrainment fraction is rejected
+PASS non-finite aw is rejected
+PASS flux through the model top is rejected
+test_pbl_edmf: 33 of 33 checks passed
+== test_pbl_edmf: PASS
+PASS valid uniform column is accepted
+PASS ground and top interfaces are closed
+PASS uniform column: G = rho*K/dz
+PASS nonuniform column: interface k+1 uses K(k), the mean dry mass and the center spacing
+PASS K above the top interface is ignored
+PASS negative exchange coefficient is rejected
+PASS non-finite exchange coefficient is rejected
+PASS nonpositive layer mass is rejected
+PASS nonpositive layer thickness is rejected
+PASS MYNN: face k uses K(k), MYNN's face density and the center spacing; surface K ignored
+PASS MYNN: negative exchange coefficient is rejected
+PASS MYNN: non-finite exchange coefficient is rejected
+PASS MYNN: nonpositive density is rejected
+PASS MYNN: the surface value is ignored
+test_pbl_gas_exchange: 14 of 14 checks passed
+== test_pbl_gas_exchange: PASS
+PASS PBL off is a supported zero-transport case
+PASS YSU with the Monin-Obukhov surface layer is supported
+PASS YSU with the revised Monin-Obukhov surface layer is supported
+PASS active PBL without a surface layer is rejected
+PASS YSU at a nondefault PBL interval is supported (held operator, P5)
+PASS MYNN is supported (local diffusion, updrafts and downdrafts)
+PASS MYNN at a nondefault PBL interval is supported (held operator, P5)
+PASS unknown PBL scheme is rejected
+PASS YSU with new Tiedtke convection is rejected (#41)
+PASS YSU with Tiedtke convection is rejected
+PASS YSU with Kain-Fritsch convection is rejected
+PASS MYNN with Grell-Freitas (the convection_permitting suite) is rejected
+PASS convection off is supported (an explicit off under any suite)
+PASS PBL off with convection is a supported zero-transport case
+PASS two OpenMP threads are rejected
+PASS one thread is supported
+PASS no column is active before the cache exists
+PASS a column with exchange is active
+PASS a column without exchange is inactive
+PASS a column never stored is inactive
+PASS apply is the diffusion kernel with the cached exchange (bitwise)
+PASS apply conserves mass and keeps a zero gas zero
+PASS a column stored from moist density is active
+PASS moist-density store uses the dry layer mass rho/(1+qv)*dz (bitwise)
+PASS a column with qv = -1 (no dry mass) is rejected
+PASS a MYNN column with exchange is active
+PASS MYNN store: bottom-face exchange with the dry density rho/(1+qv) (bitwise)
+PASS a MYNN column with negative exchange is rejected
+PASS a MYNN column without exchange or plumes is inactive
+PASS a MYNN column with plumes but no exchange is active
+PASS MYNN apply is local diffusion, then the updraft plumes, with the dry density (bitwise)
+PASS the plumes act; a zero gas stays zero
+PASS a column with invalid plumes is reported and left inactive
+PASS a MYNN column with only a downdraft is active
+PASS MYNN apply is local diffusion, then updrafts and downdrafts together (bitwise)
+PASS a downdraft cache without downdraft data is reported
+PASS a downdraft into the ground is reported and left inactive
+PASS an invalid column is reported and left inactive
+PASS default interval: valid in the refresh step
+PASS default interval: stale one step later
+PASS 9 s interval: valid two steps after refresh
+PASS 9 s interval: stale three steps after
+PASS 10 s interval: valid three steps after refresh
+PASS 10 s interval: stale four steps after
+PASS never refreshed: not valid
+PASS no refresh time before the first refresh
+PASS the refresh records the model time
+PASS three steps of a 9 s operator after a refresh are accepted
+PASS a column is active before the repeated setup
+PASS a repeated cache setup starts every column inactive
+PASS finalize clears the refresh stamp, twice over
+PASS finalize releases the cache
+PASS transport is not enabled without initialization
+test_pbl_gas: 53 of 53 checks passed
+== test_pbl_gas: PASS
+PASS dry layer mass is zz*rho_zz*dz
+PASS closed-column flux divergence conserves mass
+PASS upward flux moves mass from the lower to the upper layer
+PASS column species mass is sum(m_d*q)
+PASS zero species has zero residual
+PASS zero-species residual normalizes by sum(m_d)*1e-30
+PASS nonzero species residual is relative to its initial mass
+PASS budget reset clears the record
+PASS budget counts active columns
+PASS budget mass is area-weighted
+PASS conservative redistribution has no increment or residual
+PASS budget records extremes and applied dt
+PASS closed columns have no boundary flux
+PASS enabled unsupported configuration fails
+PASS disabled unsupported configuration is allowed
+PASS enabled supported configuration is allowed
+PASS disabled transport needs no cache
+PASS enabled transport without a restart cache fails
+PASS cache signature mismatch names both signatures
+PASS matching cache signature is accepted
+test_tracer_column: 20 of 20 checks passed
+== test_tracer_column: PASS
+PASS bound processes enable transport
+PASS enabled transport allocates both tendency buffers
+PASS assembly never writes the prognostic scalars
+PASS species 1 tendency, cell 1
+PASS species 2 tendency, cell 1
+PASS species 1 tendency, cell 2
+PASS species 2 tendency, cell 2
+PASS species 1 tendency, cell 3
+PASS species 2 tendency, cell 3
+PASS species 1 tendency, cell 4
+PASS species 2 tendency, cell 4
+PASS inactive cell keeps every tendency bit
+PASS unmapped scalars keep every tendency bit
+PASS PBL budget: two conservative columns
+PASS PBL budget: no increment, dt recorded
+PASS CU budget species 1: conservative
+PASS CU budget species 2: source is measured
+PASS CU budget species 2: residual flags the source
+PASS repeated assembly is not cumulative
+PASS budgets restart each assembly
+PASS cells beyond nCellsSolve keep every tendency bit
+PASS owned cells are still updated
+PASS an all-inactive rank keeps every tendency bit
+PASS an all-inactive rank has an empty PBL budget
+PASS an all-inactive rank has an empty CU budget
+test_tracer_transport_ops: 25 of 25 checks passed
+== test_tracer_transport_ops: PASS
+PASS processes are not enabled before initialization
+PASS map is stored
+PASS stub processes leave transport disabled
+PASS disabled transport allocates no tendency buffers
+PASS disabled transport leaves every tendency bit unchanged
+PASS disabled transport records no active columns
+PASS empty map is a no-op
+PASS empty map leaves tendencies unchanged
+PASS setup after teardown starts clean
+PASS teardown resets the map
+test_tracer_transport_stubs: 10 of 10 checks passed
+== test_tracer_transport_stubs: PASS
+PASS empty mechanism is a valid no-op
+PASS one species: count
+PASS one species: index
+PASS three species in input order
+PASS 64 species: count
+PASS 64 species: every index once, in order
+PASS reordered mechanism keeps input order
+PASS noncontiguous indices interleaved with unmapped ones
+PASS host-bound H2O, O2, N2 are excluded
+PASS species without write-back is excluded
+PASS unresolved index 0 is out of range
+PASS index above num_scalars is out of range
+PASS native scalar index is rejected
+PASS missing chemistry group is rejected
+PASS duplicate index is rejected at its second use
+PASS error texts are distinct
+test_transport_map: 16 of 16 checks passed
+== test_transport_map: PASS
+PASS stable: bl_ysu_run succeeds
+PASS stable: export is positive at interior interfaces and zero at the top
+PASS stable: CheMPAS-A operator conserves dry mass
+PASS stable: CheMPAS-A operator conserves dry mass
+PASS stable: export reproduces YSU's tracer update
+  stable: hpbl  3.41E+02 m; max K  4.95E-01 m2/s; max dt*G/m_d at 30 s  7.12E-03
+    |R_ours-R_ysu|/max|R_ysu|: dt=30 s  9.15E-03, dt=1e-3 s  2.51E-04;  error vs near-exact at 30 s: CheMPAS-A  4.68E-03, YSU  1.38E-02
+PASS stable: as dt -> 0 the operators agree to the moist/dry weighting (order qv)
+PASS convective: bl_ysu_run succeeds
+PASS convective: export is positive at interior interfaces and zero at the top
+PASS convective: CheMPAS-A operator conserves dry mass
+PASS convective: CheMPAS-A operator conserves dry mass
+PASS convective: export reproduces YSU's tracer update
+  convective: hpbl  1.38E+03 m; max K  1.60E+02 m2/s; max dt*G/m_d at 30 s  8.44E-01
+    |R_ours-R_ysu|/max|R_ysu|: dt=30 s  4.32E-01, dt=1e-3 s  9.32E-04;  error vs near-exact at 30 s: CheMPAS-A  3.29E-01, YSU  7.60E-01
+PASS convective: as dt -> 0 the operators agree to the moist/dry weighting (order qv)
+PASS convective: at dt = 30 s the CheMPAS-A step is closer to the exact solution than YSU's
+PASS convective PBL is deeper than the stable one
+PASS cloud-topped, top-down off: bl_ysu_run succeeds
+PASS cloud-topped, top-down off: export is positive at interior interfaces and zero at the top
+PASS cloud-topped, top-down off: CheMPAS-A operator conserves dry mass
+PASS cloud-topped, top-down off: CheMPAS-A operator conserves dry mass
+PASS cloud-topped, top-down off: export reproduces YSU's tracer update
+  cloud-topped, top-down off: hpbl  1.03E+03 m; max K  5.04E+01 m2/s; max dt*G/m_d at 30 s  3.27E-01
+    |R_ours-R_ysu|/max|R_ysu|: dt=30 s  2.74E-01, dt=1e-3 s  7.28E-04;  error vs near-exact at 30 s: CheMPAS-A  1.97E-01, YSU  4.71E-01
+PASS cloud-topped, top-down off: as dt -> 0 the operators agree to the moist/dry weighting (order qv)
+PASS cloud-topped, top-down on: bl_ysu_run succeeds
+PASS cloud-topped, top-down on: export is positive at interior interfaces and zero at the top
+PASS cloud-topped, top-down on: CheMPAS-A operator conserves dry mass
+PASS cloud-topped, top-down on: CheMPAS-A operator conserves dry mass
+PASS cloud-topped, top-down on: export reproduces YSU's tracer update
+  cloud-topped, top-down on: hpbl  1.03E+03 m; max K  1.10E+02 m2/s; max dt*G/m_d at 30 s  5.58E-01
+    |R_ours-R_ysu|/max|R_ysu|: dt=30 s  3.66E-01, dt=1e-3 s  7.82E-04;  error vs near-exact at 30 s: CheMPAS-A  2.81E-01, YSU  6.47E-01
+PASS cloud-topped, top-down on: as dt -> 0 the operators agree to the moist/dry weighting (order qv)
+PASS cloud-topped, top-down on: at dt = 30 s the CheMPAS-A step is closer to the exact solution than YSU's
+PASS top-down mixing changes the exported operator
+test_ysu_gas_operator: 28 of 28 checks passed
+== test_ysu_gas_operator: PASS
+PASS wrapper call succeeds
+PASS wrapper call succeeds
+PASS wrapper call succeeds
+PASS direct bl_ysu_run succeeds
+PASS exch_q(k) is bl_ysu_run's xkzqx(k), the interface between layers k and k+1 (bitwise)
+PASS exch_q is positive at interior interfaces and zero at the top
+PASS exch_q is not written at kme = kte+1
+PASS exch_q absent: every other output is unchanged (bitwise)
+PASS exch_q an unallocated array: every other output is unchanged (bitwise)
+test_ysu_wrapper_export: 9 of 9 checks passed
+== test_ysu_wrapper_export: PASS

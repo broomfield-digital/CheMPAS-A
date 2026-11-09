@@ -1,0 +1,21 @@
+/home/fillmore/Data/CheMPAS-A/p6-dev/qual2/cadence/stable_init.nc: gas profiles with vertical structure; baseline surface
+/home/fillmore/Data/CheMPAS-A/p6-dev/qual2/cadence/convective_init.nc: gas profiles with vertical structure; skintemp = sst = 305.0 K
+== call cadence
+PASS ysu-none: bl_ysu ran 20 times
+PASS ysu-none: sf_monin_obukhov ran 20 times
+PASS ysu-dt: bl_ysu ran 20 times
+PASS ysu-dt: sf_monin_obukhov ran 20 times
+PASS ysu-3dt: bl_ysu ran 7 times
+PASS ysu-3dt: sf_monin_obukhov ran 7 times
+PASS mynn-3dt: bl_mynn ran 7 times
+PASS mynn-3dt: sf_mynn ran 7 times
+PASS ysu-3dt: DT_PBL = 9 s
+== an interval equal to config_dt is the default cadence
+PASS same output times (2 records)
+PASS same output variables (unmatched: none)
+PASS every common output field bitwise identical (differing: none)
+== the default cadence is unchanged from the pre-P5 executable
+PASS same output times (2 records)
+PASS same output variables (unmatched: none)
+PASS every common output field bitwise identical (differing: none)
+PASS: PBL cadence

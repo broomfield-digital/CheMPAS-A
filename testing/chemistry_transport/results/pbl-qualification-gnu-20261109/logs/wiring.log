@@ -1,0 +1,11 @@
+== lnox
+  PASS no critical errors
+  PASS NO is transported
+  PASS NO2 is transported
+  PASS O3 is transported
+  PASS physics receives three gases
+== lnox_h2o
+  PASS no critical errors
+  PASS H2O is excluded
+  PASS physics receives three gases
+PASS: transport wiring
