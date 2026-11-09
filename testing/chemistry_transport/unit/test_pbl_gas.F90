@@ -18,7 +18,7 @@ program test_pbl_gas
    real(kind=RKIND) :: aw(nz,2), ent(nz,2), Mu(nz+1,2), Eu(nz,2), awd(nz,1), entd(nz,1), Nd(nz+1,1), Ed(nz,1)
    integer :: nsub
 
-   ! Capability gate (sketch §6.2; nondefault intervals wait for P5).
+   ! Capability gate (sketch §6.2; any PBL interval since P5).
    call pbl_gas_capability('off', 'off', 'none', supported, reason)
    call check(supported, 'PBL off is a supported zero-transport case')
    call pbl_gas_capability('bl_ysu', 'sf_monin_obukhov', 'none', supported, reason)
@@ -27,13 +27,12 @@ program test_pbl_gas
    call check(supported, 'YSU with the revised Monin-Obukhov surface layer is supported')
    call pbl_gas_capability('bl_ysu', 'off', 'none', supported, reason)
    call check(.not. supported .and. index(reason, 'surface layer') > 0, 'active PBL without a surface layer is rejected')
-   call pbl_gas_capability('bl_ysu', 'sf_monin_obukhov', '00:30:00', supported, reason)
-   call check(.not. supported .and. index(reason, 'config_pbl_interval') > 0, 'nondefault PBL interval is rejected')
+   call pbl_gas_capability('bl_ysu', 'sf_monin_obukhov', '00:00:09', supported, reason)
+   call check(supported, 'YSU at a nondefault PBL interval is supported (held operator, P5)')
    call pbl_gas_capability('bl_mynn', 'sf_mynn', 'none', supported, reason)
    call check(supported, 'MYNN is supported (local diffusion, updrafts and downdrafts)')
    call pbl_gas_capability('bl_mynn', 'sf_mynn', '00:30:00', supported, reason)
-   call check(.not. supported .and. index(reason, 'config_pbl_interval') > 0, &
-              'nondefault PBL interval is rejected with MYNN')
+   call check(supported, 'MYNN at a nondefault PBL interval is supported (held operator, P5)')
    call pbl_gas_capability('bl_other', 'sf_monin_obukhov', 'none', supported, reason)
    call check(.not. supported .and. len_trim(reason) > 0, 'unknown PBL scheme is rejected')
 

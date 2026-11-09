@@ -12,8 +12,8 @@
 # of this Kessler case, and its results are not reproducible.
 #
 # Cases:
-#   gate-interval              MYNN with a nondefault PBL interval stops the
-#                              model with the gate's message
+#   interval-runs              MYNN gas transport with a nondefault PBL interval
+#                              (6 s) runs (P5; qualified in check_pbl_intervals.sh)
 #   local-stable-on / -off     config_mynn_edmf = 0, baseline surface (288 K):
 #                              with and without gas transport, 300 s
 #   local-convective-on / -off config_mynn_edmf = 0, skintemp = sst = 305 K
@@ -70,8 +70,12 @@ source "$here/pbl_cases.sh"
 prepare_inputs
 
 echo "== gate cases"
-stage gate-interval "$run_root/stable_init.nc" "$model" 00:00:06 transport=.true. pbl_interval=00:00:06
-expect_stop gate-interval "config_pbl_interval must be 'none'"
+stage interval-runs "$run_root/stable_init.nc" "$model" 00:00:06 transport=.true. pbl_interval=00:00:06
+if run_model interval-runs && has_log interval-runs "PBL gas transport enabled = T"; then
+    echo "PASS interval-runs: MYNN gas transport runs at a nondefault PBL interval (P5; check_pbl_intervals.sh)"
+else
+    fail "interval-runs: transport at a nondefault PBL interval did not run; see $run_root/interval-runs"
+fi
 
 echo "== MYNN runs (300 s, output every 60 s)"
 stage local-stable-off "$run_root/stable_init.nc" "$model" 00:05:00 mynn_edmf=0

@@ -18,9 +18,10 @@ Checks on the PBL lines:
   - with --expect-gases, every step has exactly that many gases, each once;
   - with --expect-steps, that many distinct steps appear;
   - with --dt, every line used that time step;
-  - with --interval, every refresh is a whole number of intervals from the start
-    and the operator was refreshed less than one interval ago (0 <= t - refresh
-    < interval);
+  - with --interval, the operator was refreshed less than one interval ago
+    (0 <= t - refresh < interval), at a model step time (with --dt), and no
+    more often than the interval allows (the pbl alarm rings at the first step
+    at or after each interval, so the interval need not be a multiple of dt);
   - with --min-q, qmin >= that floor.
 
 Usage: check_transport_budget.py LOG [--expect-gases N] [--expect-steps N]
@@ -86,9 +87,12 @@ def check(rows, args):
         if args.min_q is not None and r["qmin"] < args.min_q:
             failures.append(f"{where}: qmin {r['qmin']:.3e} is below {args.min_q:g}")
         if args.interval is not None:
-            k = r["refresh"] / args.interval
-            if r["refresh"] < 0 or abs(k - round(k)) * args.interval > TIME_TOL:
-                failures.append(f"{where}: refresh {r['refresh']:g} is not a multiple of the {args.interval:g} s interval")
+            if r["refresh"] < 0:
+                failures.append(f"{where}: the operator was never refreshed")
+            elif args.dt is not None:
+                k = r["refresh"] / args.dt
+                if abs(k - round(k)) * args.dt > TIME_TOL:
+                    failures.append(f"{where}: refresh {r['refresh']:g} is not a model step time")
             age = r["t"] - r["refresh"]
             if age < -TIME_TOL or age > args.interval - TIME_TOL:
                 failures.append(f"{where}: the operator from {r['refresh']:g} s is older than the "
@@ -97,6 +101,15 @@ def check(rows, args):
         for t, gases in sorted(by_step.items()):
             if sorted(gases) != list(range(1, args.expect_gases + 1)):
                 failures.append(f"t={t:g}: gas lines {sorted(gases)}, expected 1..{args.expect_gases} once each")
+    if args.interval is not None:
+        # the pbl alarm rings at the first step at or after each interval, so a run spanning [t0, t1] has at
+        # most floor((t1-t0)/interval)+1 refreshes; more means the PBL ran more often than its interval
+        refreshes = {r["refresh"] for r in rows}
+        times = [r["t"] for r in rows]
+        allowed = int((max(times) - min(times) + TIME_TOL) // args.interval) + 1
+        if len(refreshes) > allowed:
+            failures.append(f"{len(refreshes)} operator refreshes in {min(times):g}-{max(times):g} s, at most "
+                            f"{allowed} expected with a {args.interval:g} s interval")
     if args.expect_steps is not None and len(by_step) != args.expect_steps:
         failures.append(f"{len(by_step)} steps logged, expected {args.expect_steps}")
     summary = {

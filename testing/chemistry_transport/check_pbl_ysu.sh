@@ -8,8 +8,8 @@
 # Usage: check_pbl_ysu.sh BASELINE_DIR RUN_ROOT [MODEL [PRE_P3_MODEL]]
 #
 # Cases (MYNN's gate cases are in check_pbl_mynn.sh):
-#   gate-interval              transport requested with a nondefault PBL
-#                              interval stops the model with the gate's message
+#   interval-runs              transport with a nondefault PBL interval (6 s) runs
+#                              (P5; qualified in check_pbl_intervals.sh)
 #   gate-no-sfclayer           YSU without a surface layer stops in MPAS's own
 #                              physics_namelist_check, before transport init
 #                              (the gas gate's message is unit-tested)
@@ -63,8 +63,12 @@ source "$here/pbl_cases.sh"
 prepare_inputs
 
 echo "== gate cases"
-stage gate-interval "$run_root/stable_init.nc" "$model" 00:00:06 transport=.true. pbl_interval=00:00:06
-expect_stop gate-interval "config_pbl_interval must be 'none'"
+stage interval-runs "$run_root/stable_init.nc" "$model" 00:00:06 transport=.true. pbl_interval=00:00:06
+if run_model interval-runs && has_log interval-runs "PBL gas transport enabled = T"; then
+    echo "PASS interval-runs: YSU gas transport runs at a nondefault PBL interval (P5; check_pbl_intervals.sh)"
+else
+    fail "interval-runs: transport at a nondefault PBL interval did not run; see $run_root/interval-runs"
+fi
 stage gate-no-sfclayer "$run_root/stable_init.nc" "$model" 00:00:06 sfclayer=off transport=.true.
 expect_stop gate-no-sfclayer "wrong choice for surface layer scheme with YSU PBL"
 stage gate-pbl-off "$run_root/stable_init.nc" "$model" 00:00:06 pbl=off sfclayer=off transport=.true.

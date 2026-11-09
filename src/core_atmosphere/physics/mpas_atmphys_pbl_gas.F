@@ -60,8 +60,7 @@
 !config_mynn_edmf_dd); PBL off is a supported zero-transport case. With MYNN's mass-flux scheme the driver also
 !stores each updraft's and downdraft's dry mass flux and mass-consistent entrainment
 !(pbl_gas_cache_store_mynn_plumes), and pbl_gas_apply follows the diffusion with the plume transport of
-!mpas_atmphys_pbl_edmf, rebuilt from the post-chemistry gases. Nondefault PBL intervals (P5) stop the model when
-!gas transport is requested.
+!mpas_atmphys_pbl_edmf, rebuilt from the post-chemistry gases. Any config_pbl_interval is supported (P5).
 
 
  logical,save:: enabled = .false.
@@ -123,6 +122,8 @@
  call pbl_gas_capability(pbl_scheme,sfclayer_scheme,pbl_interval,supported,reason)
  call tracer_transport_check_capability('PBL',.true.,pbl_scheme,supported,reason)
  enabled = trim(pbl_scheme) /= 'off'
+ if(enabled) call mpas_log_write('[transport] PBL: gas operator refreshed at each PBL call (config_pbl_interval = '// &
+                                 trim(pbl_interval)//') and applied every model step')
 !MYNN runs its downdrafts only inside its updraft scheme.
  mynn_updrafts   = trim(pbl_scheme) == 'bl_mynn' .and. edmf == 1
  mynn_downdrafts = mynn_updrafts .and. edmf_dd == 1
@@ -149,7 +150,9 @@
 !=================================================================================================================
  pure subroutine pbl_gas_capability(pbl_scheme,sfclayer_scheme,pbl_interval,supported,reason)
 !=================================================================================================================
-!qualified PBL configurations for MICM gas transport: YSU (P3) and MYNN in every mass-flux mode (P4).
+!qualified PBL configurations for MICM gas transport: YSU (P3) and MYNN in every mass-flux mode (P4), at any
+!PBL interval (P5: the held operator is applied every step, pbl_gas_begin_step). pbl_interval is accepted
+!so interval-specific restrictions can be stated here; none is needed today.
  character(len=*),intent(in):: pbl_scheme,sfclayer_scheme,pbl_interval
  logical,intent(out):: supported
  character(len=*),intent(out):: reason
@@ -171,9 +174,6 @@
     if(trim(sfclayer_scheme) == 'off') then
        supported = .false.
        reason    = 'an active PBL scheme requires a surface layer scheme'
-    elseif(trim(pbl_interval) /= 'none') then
-       supported = .false.
-       reason    = 'config_pbl_interval must be ''none'' until held PBL operators are qualified (P5)'
     endif
  endif
 

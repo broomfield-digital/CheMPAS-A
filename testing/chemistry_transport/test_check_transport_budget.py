@@ -46,10 +46,26 @@ def test_relative_increment_over_threshold_fails():
     assert any("rel" in f for f in failures), failures
 
 
-def test_refresh_off_the_interval_fails():
-    text = line(3.0, 1, refresh=3.0) + "\n"
-    failures, _ = run(text, "--interval", "9")
-    assert any("multiple" in f for f in failures), failures
+def test_refresh_every_step_at_a_longer_interval_fails():
+    failures, _ = run(log(steps=7, interval=3.0), "--interval", "9", "--dt", "3")
+    assert any("refreshes" in f for f in failures), failures
+
+
+def test_refresh_between_steps_fails():
+    text = line(3.0, 1, refresh=1.5) + "\n"
+    failures, _ = run(text, "--interval", "9", "--dt", "3")
+    assert any("step time" in f for f in failures), failures
+
+
+def test_interval_not_a_multiple_of_dt_passes():
+    # 10-s interval, 3-s steps: the pbl alarm rings at the first step at or after 0, 10, 20, 30 s
+    rows = []
+    for s in range(14):
+        t = 3.0 * s
+        refresh = max(r for r in (0.0, 12.0, 21.0, 30.0) if r <= t)
+        rows.append(line(t, 1, refresh=refresh))
+    failures, _ = run("\n".join(rows) + "\n", "--interval", "10", "--dt", "3", "--expect-steps", "14")
+    assert failures == [], failures
 
 
 def test_operator_held_for_a_whole_interval_fails():
