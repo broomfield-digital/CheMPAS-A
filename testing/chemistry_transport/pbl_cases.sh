@@ -82,6 +82,9 @@ if 'pbl_interval' in options:
 for key in ('mynn_edmf', 'mynn_edmf_dd', 'mynn_edmf_output'):
     if key in options:
         setopt(f'config_{key}', options[key], 'physics')
+if 'v_eddy_visc2' in options:
+    setopt('config_v_mom_eddy_visc2', options['v_eddy_visc2'], 'nhyd_model')
+    setopt('config_v_theta_eddy_visc2', options['v_eddy_visc2'], 'nhyd_model')
 if 'budget' in options:
     setopt('config_micm_transport_budget', options['budget'], 'physics')
 if 'convection' in options:
