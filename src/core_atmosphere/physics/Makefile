@@ -115,6 +115,7 @@ mpas_atmphys_driver.o: \
 	mpas_atmphys_driver_oml.o \
 	mpas_atmphys_constants.o \
 	mpas_atmphys_interface.o \
+	mpas_atmphys_pbl_gas.o \
 	mpas_atmphys_sfc_diagnostics.o \
 	mpas_atmphys_update.o \
 	mpas_atmphys_vars.o

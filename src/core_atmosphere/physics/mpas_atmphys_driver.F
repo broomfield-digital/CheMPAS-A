@@ -25,7 +25,8 @@
  use mpas_atmphys_interface
  use mpas_atmphys_sfc_diagnostics,only: atmphys_sfc_diagnostics
  use mpas_atmphys_update
- use mpas_atmphys_vars, only: l_camlw,l_conv,l_pbl,l_radtlw,l_radtsw
+ use mpas_atmphys_vars, only: l_camlw,l_conv,l_pbl,l_radtlw,l_radtsw,dt_pbl
+ use mpas_atmphys_pbl_gas, only: pbl_gas_enabled,pbl_gas_cache_refreshed
  use mpas_timer
 
  implicit none
@@ -331,6 +332,8 @@
        end do
 !$OMP END PARALLEL DO
        call deallocate_pbl(block%configs)
+       !every owned column's MICM gas operator is now from this PBL call (held until the next one):
+       if(pbl_gas_enabled()) call pbl_gas_cache_refreshed(xtime_s,dt_pbl)
 
     endif
 

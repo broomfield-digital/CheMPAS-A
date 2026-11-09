@@ -32,6 +32,10 @@
           pbl_gas_enabled,            &
           pbl_gas_active,             &
           pbl_gas_apply,              &
+          pbl_gas_cache_refreshed,    &
+          pbl_gas_operator_valid,     &
+          pbl_gas_begin_step,         &
+          pbl_gas_refresh_time,       &
           pbl_gas_finalize
 
 
@@ -40,13 +44,18 @@
 !   pbl_gas_init(block,nTransport)   resolve the scheme and check capability, once after chemistry_init
 !   pbl_gas_enabled()                true when PBL gas transport can act in any column
 !   pbl_gas_active(iCell)            true when the cached operator acts in column iCell this step
+!   pbl_gas_begin_step(dt)           once per assembly, before any pbl_gas_apply: stops the model unless the held
+!                                    operator was refreshed within its PBL interval
 !   pbl_gas_apply(iCell,dt,m_d,q)    q(nTransport,nVertLevels) -> q after dt [kg/kg dry air], closed column
 !   pbl_gas_finalize()
 !
-!Each model step, the PBL driver stores the scheme's scalar exchange as interface exchange G [kg m-2 s-1]
-!(pbl_gas_cache_store_column) before chemistry runs; transport assembly in the same step applies the
-!closed-column backward-Euler diffusion with the model dt to the post-chemistry gases. Only the operator is
-!held, never a gas increment. Supported at the default PBL interval, with a surface layer scheme: YSU (with
+!Each time the PBL scheme runs (every step at the default interval, else when the pbl alarm rings), the PBL
+!driver stores the scheme's scalar exchange as interface exchange G [kg m-2 s-1] (pbl_gas_cache_store_column)
+!before chemistry runs, then stamps the cache (pbl_gas_cache_refreshed). Every model step, transport assembly
+!applies the held operator, closed-column backward-Euler diffusion with the model dt, to the post-chemistry
+!gases, as the held meteorological PBL tendencies are applied between PBL calls. Only the operator is held,
+!never a gas increment; it is not restarted, because the pbl alarm rings at a restart's first step and
+!rebuilds it before use. Supported with a surface layer scheme: YSU (with
 !or without top-down mixing) and MYNN, local diffusion with or without its mass-flux scheme (config_mynn_edmf,
 !config_mynn_edmf_dd); PBL off is a supported zero-transport case. With MYNN's mass-flux scheme the driver also
 !stores each updraft's and downdraft's dry mass flux and mass-consistent entrainment
@@ -64,6 +73,12 @@
  real(kind=RKIND),dimension(:,:,:),allocatable,save:: eu_cache ! (nVertLevels,nup,nCellsSolve) plume entrainment
  real(kind=RKIND),dimension(:,:,:),allocatable,save:: nd_cache ! (nVertLevels+1,ndown,nCellsSolve) downdraft flux
  real(kind=RKIND),dimension(:,:,:),allocatable,save:: ed_cache ! (nVertLevels,ndown,nCellsSolve) its entrainment
+
+!refresh stamp of the held operator: model steps since the PBL scheme last refreshed it (-1 before the first
+!refresh), and the model time [s] and PBL interval dt_pbl [s] of that refresh.
+ integer,save:: refresh_age = -1
+ real(kind=RKIND),save:: refresh_time = -1._RKIND
+ real(kind=RKIND),save:: refresh_interval = 0._RKIND
 
 
  contains
@@ -399,6 +414,60 @@
  end subroutine pbl_gas_apply
 
 !=================================================================================================================
+ subroutine pbl_gas_cache_refreshed(time_s,interval_s)
+!=================================================================================================================
+!stamp the cache after the PBL driver has stored every owned column in this PBL call: time_s is the model time
+!of the call [s], interval_s the PBL interval dt_pbl [s] (config_dt at the default interval).
+ real(kind=RKIND),intent(in):: time_s,interval_s
+
+ refresh_age      = 0
+ refresh_time     = time_s
+ refresh_interval = interval_s
+
+ end subroutine pbl_gas_cache_refreshed
+
+!=================================================================================================================
+ pure logical function pbl_gas_operator_valid(age,dt,interval)
+!=================================================================================================================
+!true when an operator refreshed age model steps ago (age 0: this step) may still be applied with time step dt:
+!it covers [refresh, refresh + interval), so age*dt < interval. The pbl alarm rings at the first step at or
+!after each interval, so the largest age reached is ceiling(interval/dt)-1. The relative margin keeps a step
+!that lands on the next refresh time stale despite rounding.
+ integer,intent(in):: age
+ real(kind=RKIND),intent(in):: dt,interval
+
+ pbl_gas_operator_valid = age >= 0
+ if(pbl_gas_operator_valid) &
+    pbl_gas_operator_valid = real(age,kind=RKIND)*dt < interval*(1._RKIND-1.e-10_RKIND)
+
+ end function pbl_gas_operator_valid
+
+!=================================================================================================================
+ subroutine pbl_gas_begin_step(dt)
+!=================================================================================================================
+!once per transport assembly, before pbl_gas_apply: stop the model if the held operator has never been built
+!or has outlived its PBL interval (a refresh was missed), then age it by one model step.
+ real(kind=RKIND),intent(in):: dt
+
+ if(refresh_age < 0) &
+    call physics_error_fatal('[transport] PBL: the MICM gas operator is used before the PBL scheme has run')
+ if(.not.pbl_gas_operator_valid(refresh_age,dt,refresh_interval)) &
+    call physics_error_fatal('[transport] PBL: the held MICM gas operator is older than config_pbl_interval '// &
+                             '(the PBL scheme did not refresh it)')
+ refresh_age = refresh_age + 1
+
+ end subroutine pbl_gas_begin_step
+
+!=================================================================================================================
+ real(kind=RKIND) function pbl_gas_refresh_time()
+!=================================================================================================================
+!model time [s] of the last refresh; -1 before the first.
+
+ pbl_gas_refresh_time = refresh_time
+
+ end function pbl_gas_refresh_time
+
+!=================================================================================================================
  subroutine pbl_gas_finalize
 !=================================================================================================================
 
@@ -408,9 +477,12 @@
  if(allocated(eu_cache)  ) deallocate(eu_cache)
  if(allocated(nd_cache)  ) deallocate(nd_cache)
  if(allocated(ed_cache)  ) deallocate(ed_cache)
- enabled         = .false.
- mynn_updrafts   = .false.
- mynn_downdrafts = .false.
+ enabled          = .false.
+ mynn_updrafts    = .false.
+ mynn_downdrafts  = .false.
+ refresh_age      = -1
+ refresh_time     = -1._RKIND
+ refresh_interval = 0._RKIND
 
  end subroutine pbl_gas_finalize
 

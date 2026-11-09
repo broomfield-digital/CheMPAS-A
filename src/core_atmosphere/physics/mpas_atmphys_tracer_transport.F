@@ -11,7 +11,8 @@
  use mpas_pool_routines,only: mpas_pool_get_array,mpas_pool_get_dimension
  use mpas_log,only: mpas_log_write
  use mpas_atmphys_tracer_column,only: transport_budget_t,budget_reset,budget_accumulate,column_dry_mass
- use mpas_atmphys_pbl_gas,only: pbl_gas_init,pbl_gas_enabled,pbl_gas_active,pbl_gas_apply,pbl_gas_finalize
+ use mpas_atmphys_pbl_gas,only: pbl_gas_init,pbl_gas_enabled,pbl_gas_active,pbl_gas_apply,pbl_gas_finalize, &
+                                pbl_gas_begin_step,pbl_gas_refresh_time
  use mpas_atmphys_cu_gas ,only: cu_gas_init ,cu_gas_enabled ,cu_gas_active ,cu_gas_apply ,cu_gas_finalize
 
  implicit none
@@ -237,6 +238,8 @@
 
  pbl_any = pbl_gas_enabled()
  cu_any  = cu_gas_enabled()
+!the held PBL operator must be current for this step (it stops the model otherwise):
+ if(pbl_any) call pbl_gas_begin_step(dt)
  allocate(q0(nTransport,nVertLevels),q1(nTransport,nVertLevels),q2(nTransport,nVertLevels))
 
  do iCell = 1, nCellsSolve
@@ -268,6 +271,11 @@
  enddo
 
  deallocate(q0,q1,q2)
+ if(pbl_any) then
+    do n = 1, nTransport
+       bud_pbl(n)%refresh_time = pbl_gas_refresh_time()
+    enddo
+ endif
 
  end subroutine tracer_transport_assemble_columns
 

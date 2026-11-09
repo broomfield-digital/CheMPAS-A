@@ -147,7 +147,26 @@ program test_pbl_gas
    call pbl_gas_cache_store_column(1, kzq, m_d, dz, ok)
    call check(.not. ok .and. .not. pbl_gas_active(1), 'an invalid column is reported and left inactive')
 
+   ! Held operator (P5): valid for the steps before the next refresh, judged by its age in model steps.
+   call check(pbl_gas_operator_valid(0, 3.0_RKIND, 3.0_RKIND), 'default interval: valid in the refresh step')
+   call check(.not. pbl_gas_operator_valid(1, 3.0_RKIND, 3.0_RKIND), 'default interval: stale one step later')
+   call check(pbl_gas_operator_valid(2, 3.0_RKIND, 9.0_RKIND), '9 s interval: valid two steps after refresh')
+   call check(.not. pbl_gas_operator_valid(3, 3.0_RKIND, 9.0_RKIND), '9 s interval: stale three steps after')
+   call check(pbl_gas_operator_valid(3, 3.0_RKIND, 10.0_RKIND), '10 s interval: valid three steps after refresh')
+   call check(.not. pbl_gas_operator_valid(4, 3.0_RKIND, 10.0_RKIND), '10 s interval: stale four steps after')
+   call check(.not. pbl_gas_operator_valid(-1, 3.0_RKIND, 9.0_RKIND), 'never refreshed: not valid')
+
    call pbl_gas_finalize()
+   call check(pbl_gas_refresh_time() == -1.0_RKIND, 'no refresh time before the first refresh')
+   call pbl_gas_cache_refreshed(27.0_RKIND, 9.0_RKIND)
+   call check(pbl_gas_refresh_time() == 27.0_RKIND, 'the refresh records the model time')
+   call pbl_gas_begin_step(3.0_RKIND)
+   call pbl_gas_begin_step(3.0_RKIND)
+   call pbl_gas_begin_step(3.0_RKIND)
+   call check(.true., 'three steps of a 9 s operator after a refresh are accepted')
+
+   call pbl_gas_finalize()
+   call check(pbl_gas_refresh_time() == -1.0_RKIND, 'finalize clears the refresh stamp')
    call check(.not. pbl_gas_active(1), 'finalize releases the cache')
    call check(.not. pbl_gas_enabled(), 'transport is not enabled without initialization')
 

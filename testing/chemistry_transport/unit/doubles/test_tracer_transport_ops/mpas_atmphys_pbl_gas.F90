@@ -6,7 +6,8 @@
 
  implicit none
  private
- public:: pbl_gas_init,pbl_gas_enabled,pbl_gas_active,pbl_gas_apply,pbl_gas_finalize
+ public:: pbl_gas_init,pbl_gas_enabled,pbl_gas_active,pbl_gas_apply,pbl_gas_finalize, &
+         pbl_gas_begin_step,pbl_gas_refresh_time
 
  contains
 
@@ -36,6 +37,14 @@
     q(n,2) = q(n,2) + moved/m_d(2)
  enddo
  end subroutine pbl_gas_apply
+
+ subroutine pbl_gas_begin_step(dt)
+ real(kind=RKIND),intent(in):: dt
+ end subroutine pbl_gas_begin_step
+
+ real(kind=RKIND) function pbl_gas_refresh_time()
+ pbl_gas_refresh_time = -1._RKIND
+ end function pbl_gas_refresh_time
 
  subroutine pbl_gas_finalize
  end subroutine pbl_gas_finalize
