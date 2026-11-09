@@ -7,10 +7,23 @@
 #
 # Each check writes its runs under RUN_ROOT/<check> and its log to
 # RUN_ROOT/<check>.log. --dry-run lists the commands and checks that every
-# script exists. Afterwards RUN_ROOT holds:
-#   summary.json    each check: PASS or FAIL, elapsed seconds, log
-#   manifest.json   revision, source status, executable SHA-256, compiler,
-#                   MPI, NetCDF and MUSICA versions, baseline and its hashes
+# script and reference exists.
+#
+# The model and the reference executables are copied into RUN_ROOT before the
+# first check, and every check runs the copies. The base comparisons need the
+# executables before each stage, named by environment variables:
+#   CHEMPAS_PRE_P3_MODEL  before P3 (check_pbl_ysu.sh: transport off, bitwise)
+#   CHEMPAS_PRE_P4_MODEL  before P4, with the MYNN snow-content fix
+#                         (check_pbl_mynn.sh)
+#   CHEMPAS_PRE_P5_MODEL  before P5 (check_pbl_cadence.sh: no interval, bitwise)
+# Without one, that check skips its comparison and the run is "incomplete".
+#
+# qualification_record.py records the source, executables, toolchain, baseline
+# and fine grid at the start, and again at the end. Afterwards RUN_ROOT holds:
+#   summary.json    the status (pass, incomplete or fail) and each check:
+#                   PASS or FAIL, elapsed seconds, log, any SKIP lines
+#   manifest.json   the start record, the end time, any change to the source or
+#                   an executable during the run (a failure), and the results
 # The 60-s smoke run is compared with the tracked P1 reference
 # (results/supercell-lnox-gnu-20261107/smoke-60s-summary.json). The fine grid
 # is prepared under RUN_ROOT/fine-grid unless CHEMPAS_FINE_GRID names an
@@ -38,16 +51,23 @@ fi
 fine=${CHEMPAS_FINE_GRID:-$run_root/fine-grid}
 smoke_reference=$here/results/supercell-lnox-gnu-20261107/smoke-60s-summary.json
 
-# name | command (run from the repository root; $B baseline, $R run root, $M model)
+declare -A references=(
+    [pre_p3]=${CHEMPAS_PRE_P3_MODEL:-}
+    [pre_p4]=${CHEMPAS_PRE_P4_MODEL:-}
+    [pre_p5]=${CHEMPAS_PRE_P5_MODEL:-}
+)
+
+# name | command (run from the repository root; $B baseline, $R run root, $M model,
+# $P3, $P4, $P5 the reference executables or empty)
 checks=(
-    "python-unit|for t in testing/chemistry_transport/test_check_*.py; do python \"\$t\" || exit 1; done && python testing/chemistry_transport/check_pbl_reactive.py --self-test && python testing/chemistry_transport/check_pbl_fine.py --self-test && python testing/chemistry_transport/make_fine_zeta_levels.py --self-test"
+    "python-unit|for t in testing/chemistry_transport/test_check_*.py; do python \"\$t\" || exit 1; done && python testing/chemistry_transport/check_pbl_reactive.py --self-test && python testing/chemistry_transport/check_pbl_fine.py --self-test && python testing/chemistry_transport/make_fine_zeta_levels.py --self-test && python testing/chemistry_transport/qualification_record.py --self-test"
     "fortran-unit|bash testing/chemistry_transport/unit/run_unit_tests.sh"
     "mmm-patches|bash testing/chemistry_transport/test_apply_mmm_patches.sh"
     "wiring|testing/chemistry_transport/check_transport_wiring.sh \"\$B\" \"\$R/wiring\" \"\$M\""
     "realized-increment|testing/chemistry_transport/check_realized_increment.sh \"\$B\" \"\$R/realized-increment\""
-    "ysu|testing/chemistry_transport/check_pbl_ysu.sh \"\$B\" \"\$R/ysu\" \"\$M\""
-    "mynn|testing/chemistry_transport/check_pbl_mynn.sh \"\$B\" \"\$R/mynn\" \"\$M\""
-    "cadence|testing/chemistry_transport/check_pbl_cadence.sh \"\$B\" \"\$R/cadence\" \"\$M\""
+    "ysu|testing/chemistry_transport/check_pbl_ysu.sh \"\$B\" \"\$R/ysu\" \"\$M\" \${P3:+\"\$P3\"}"
+    "mynn|testing/chemistry_transport/check_pbl_mynn.sh \"\$B\" \"\$R/mynn\" \"\$M\" \${P4:+\"\$P4\"}"
+    "cadence|testing/chemistry_transport/check_pbl_cadence.sh \"\$B\" \"\$R/cadence\" \"\$M\" \${P5:+\"\$P5\"}"
     "intervals|testing/chemistry_transport/check_pbl_intervals.sh \"\$B\" \"\$R/intervals\" \"\$M\""
     "restart|testing/chemistry_transport/check_pbl_restart.sh \"\$B\" \"\$R/restart\" \"\$M\""
     "chemistry-intervals|testing/chemistry_transport/check_pbl_chemistry_intervals.sh \"\$B\" \"\$R/chemistry-intervals\" \"\$M\""
@@ -69,15 +89,43 @@ if (( dry )); then
         done
     done
     [[ -f "$smoke_reference" ]] || { echo "  MISSING $smoke_reference"; missing=1; }
+    for name in pre_p3 pre_p4 pre_p5; do
+        path=${references[$name]}
+        if [[ -z "$path" ]]; then
+            echo "  NO REFERENCE $name: its base comparison will be skipped (the run is then incomplete)"
+        elif [[ ! -x "$path" ]]; then
+            echo "  MISSING reference $name: $path"; missing=1
+        else
+            echo "  reference $name: $path"
+        fi
+    done
     (( missing == 0 )) && echo "dry run: every script exists"
     exit "$missing"
 fi
 
-mkdir -p "$run_root"
+for name in pre_p3 pre_p4 pre_p5; do
+    [[ -z "${references[$name]}" || -x "${references[$name]}" ]] || { echo "Not executable: ${references[$name]}" >&2; exit 2; }
+done
+mkdir -p "$run_root/executables"
 run_root=$(cd "$run_root" && pwd)
 [[ $fine == /* ]] || fine=$run_root/fine-grid
 source "$baseline/environment.sh"
-export B=$baseline R=$run_root M=$model F=$fine S=$smoke_reference
+# the checks run copies, so a rebuild in the checkout cannot reach them mid-run
+cp -p "$model" "$run_root/executables/atmosphere_model"
+record=(--source-model "$model")
+P3= P4= P5=
+for name in pre_p3 pre_p4 pre_p5; do
+    [[ -n "${references[$name]}" ]] || continue
+    cp -p "${references[$name]}" "$run_root/executables/$name-atmosphere_model"
+    record+=(--reference "$name=$run_root/executables/$name-atmosphere_model")
+done
+[[ -n "${references[pre_p3]}" ]] && P3=$run_root/executables/pre_p3-atmosphere_model
+[[ -n "${references[pre_p4]}" ]] && P4=$run_root/executables/pre_p4-atmosphere_model
+[[ -n "${references[pre_p5]}" ]] && P5=$run_root/executables/pre_p5-atmosphere_model
+model=$run_root/executables/atmosphere_model
+[[ -d "$fine" ]] && record+=(--fine-grid "$fine")
+python3 "$here/qualification_record.py" start "$run_root" "$repo" "$model" "$baseline" "${record[@]}"
+export B=$baseline R=$run_root M=$model F=$fine S=$smoke_reference P3 P4 P5
 results=$run_root/results.tsv
 : > "$results"
 cd "$repo"
@@ -97,77 +145,8 @@ for entry in "${checks[@]}"; do
     echo "$result $name (${elapsed} s); log: $run_root/$name.log"
 done
 
-python3 - "$run_root" "$repo" "$model" "$baseline" <<'PY'
-import hashlib
-import json
-import os
-import platform
-import subprocess
-import sys
-from datetime import datetime, timezone
-from pathlib import Path
-
-run_root, repo, model, baseline = map(Path, sys.argv[1:])
-
-
-def sh(*cmd):
-    try:
-        return subprocess.run(cmd, capture_output=True, text=True, check=True).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
-        return None
-
-
-def first_line(text):
-    return text.splitlines()[0] if text else None
-
-
-def sha256(path):
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for block in iter(lambda: f.read(1 << 20), b""):
-            h.update(block)
-    return h.hexdigest()
-
-
-rows = [line.split("\t") for line in (run_root / "results.tsv").read_text().splitlines() if line]
-checks = [{"check": n, "result": r, "elapsed_s": int(e), "log": log} for n, r, e, log in rows]
-summary = {"status": "pass" if all(c["result"] == "PASS" for c in checks) else "fail", "checks": checks}
-(run_root / "summary.json").write_text(json.dumps(summary, indent=1) + "\n")
-
-base_manifest = json.loads((baseline / "manifest.json").read_text()) if (baseline / "manifest.json").exists() else {}
-manifest = {
-    "status": summary["status"],
-    "case": "MICM gas PBL transport qualification (docs/plans/pbl-transport.md, P5-P6)",
-    "date_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-    "host": platform.node(),
-    "run_root": str(run_root),
-    "source": {
-        "revision": sh("git", "-C", str(repo), "rev-parse", "HEAD"),
-        "branch": sh("git", "-C", str(repo), "rev-parse", "--abbrev-ref", "HEAD"),
-        "tracked_changes": sh("git", "-C", str(repo), "status", "--short", "--untracked-files=no") or "",
-    },
-    "executable": {"path": str(model), "sha256": sha256(model)},
-    "toolchain": {
-        "platform": f"{platform.system()} {platform.machine()}",
-        "compiler": first_line(sh("gfortran", "--version")),
-        "mpi": first_line(sh("mpirun", "--version")),
-        "netcdf_c": sh("nc-config", "--version"),
-        "netcdf_fortran": sh("nf-config", "--version"),
-        "musica_prefix": os.environ.get("MUSICA_PREFIX"),
-        "precision": "double",
-        "openmp": False,
-        "ranks": 8,
-    },
-    "baseline": {
-        "directory": str(baseline),
-        "supercell_init_sha256": sha256(baseline / "supercell_init.nc"),
-        "chemistry": base_manifest.get("chemistry", {}),
-        "toolchain": base_manifest.get("toolchain", {}),
-    },
-    "checks": {c["check"]: c["result"] for c in checks},
-}
-(run_root / "manifest.json").write_text(json.dumps(manifest, indent=1) + "\n")
-print(f"{summary['status'].upper()}: {sum(c['result'] == 'PASS' for c in checks)} of {len(checks)} checks passed")
-PY
-grep -q $'\tFAIL\t' "$results" && exit 1
-exit 0
+set +e
+python3 "$here/qualification_record.py" finish "$run_root" "$repo"
+rc=$?
+set -e
+exit "$rc"
