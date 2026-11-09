@@ -28,8 +28,14 @@ PY
 stage() {
     # stage CASE INIT MODEL DURATION KEY=VALUE...  namelist options: pbl, sfclayer, transport
     # (default leaves config_micm_pbl_transport unset), pblmix, pbl_interval, mynn_edmf, mynn_edmf_dd,
-    # mynn_edmf_output, budget (config_micm_transport_budget); extra_output adds comma-separated fields to
-    # the output stream.
+    # mynn_edmf_output, budget (config_micm_transport_budget), convection, chemistry_interval,
+    # mechanism=PATH (a MICM file instead of the inert one), j_no2_max (default 0, as inert),
+    # lnox_source_rate (default 0: lightning off); ranks=N runs
+    # on N ranks (run_model) with supercell.graph.info.part.N from $CHEMPAS_PARTITIONS (default
+    # ~/Data/MPAS/supercell); streams:
+    # output_interval (history, default 00:01:00), restart_interval (restart stream; default as the
+    # baseline); restart_from=PATH restarts from that restart file (config_do_restart, with the start time
+    # from its name); extra_output adds comma-separated fields to the output stream.
     local case_dir=$run_root/$1 init=$2 exe=$3 duration=$4
     mkdir -p "$case_dir"
     for name in namelist.atmosphere streams.atmosphere stream_list.atmosphere.output \
@@ -78,18 +84,44 @@ for key in ('mynn_edmf', 'mynn_edmf_dd', 'mynn_edmf_output'):
         setopt(f'config_{key}', options[key], 'physics')
 if 'budget' in options:
     setopt('config_micm_transport_budget', options['budget'], 'physics')
-setopt('config_lnox_source_rate', '0.0', 'lnox')
+if 'convection' in options:
+    setopt('config_convection_scheme', f"'{options['convection']}'", 'physics')
+if 'chemistry_interval' in options:
+    setopt('config_chemistry_interval', options['chemistry_interval'], 'chemistry')
+if 'restart_from' in options:
+    src = Path(options['restart_from']).resolve()
+    stamp = src.name[len('restart.'):-len('.nc')]              # 0000-01-01_18.01.12
+    day, clock = stamp.split('_')
+    setopt('config_start_time', f"'{day}_{clock.replace('.', ':')}'", 'nhyd_model')
+    setopt('config_do_restart', '.true.', 'restart')
+    os.symlink(src, run / src.name)
+setopt('config_lnox_source_rate', options.get('lnox_source_rate', '0.0'), 'lnox')
 setopt('config_tuvx_config_file', "''", 'photolysis')
 setopt('config_tuvx_top_extension', '.false.', 'photolysis')
 setopt('config_tuvx_upper_column_mode', "'none'", 'photolysis')
 setopt('config_tuvx_extension_file', "''", 'photolysis')
-setopt('config_j_no2_max', '0.0', 'photolysis')
+setopt('config_j_no2_max', options.get('j_no2_max', '0.0'), 'photolysis')
 nml.write_text(text)
+if 'ranks' in options:
+    ranks = int(options['ranks'])
+    (run / 'ranks').write_text(f'{ranks}\n')
+    if ranks > 1:
+        parts = Path(os.environ.get('CHEMPAS_PARTITIONS', Path.home() / 'Data/MPAS/supercell'))
+        (run / f'supercell.graph.info.part.{ranks}').write_bytes((parts / f'supercell.graph.info.part.{ranks}').read_bytes())
+if 'mechanism' in options:
+    (run / 'lnox_o3.yaml').unlink()
+    (run / 'lnox_o3.yaml').write_text(Path(options['mechanism']).read_text())
 
 streams = run / 'streams.atmosphere'
 s = streams.read_text()
 assert 'output_interval="00:10:00"' in s
-streams.write_text(s.replace('output_interval="00:10:00"', 'output_interval="00:01:00"'))
+s = s.replace('output_interval="00:10:00"', f"output_interval=\"{options.get('output_interval', '00:01:00')}\"")
+if 'restart_interval' in options:
+    m = re.search(r'<immutable_stream\s+name="restart".*?>', s, flags=re.S)
+    tag, n = re.subn(r'output_interval="[^"]*"', f'output_interval="{options["restart_interval"]}"', m.group(0))
+    assert n == 1, 'restart stream has no output_interval'
+    s = s[:m.start()] + tag + s[m.end():]
+streams.write_text(s)
 listing = run / 'stream_list.atmosphere.output'
 names = [n for n in listing.read_text().split() if n != 'j_jNO2']
 names += ['hpbl', 'kpbl', 'hfx', 'ust', 'kzh']
@@ -99,10 +131,11 @@ PY
 }
 
 run_model() {
-    # run_model CASE: returns the model's exit status
-    local case_dir=$run_root/$1
+    # run_model CASE: returns the model's exit status. Eight ranks, or the count staged with ranks=N.
+    local case_dir=$run_root/$1 ranks=8
+    [[ -f "$case_dir/ranks" ]] && ranks=$(< "$case_dir/ranks")
     set +e
-    (cd "$case_dir" && mpiexec -n 8 ./atmosphere_model > run.out 2>&1)
+    (cd "$case_dir" && mpiexec -n "$ranks" ./atmosphere_model > run.out 2>&1)
     local rc=$?
     set -e
     return $rc

@@ -91,20 +91,21 @@
  integer,intent(in):: nTransport
 
  logical,pointer:: requested
- character(len=StrKIND),pointer:: pbl_scheme,sfclayer_scheme,pbl_interval
- integer,pointer:: mynn_edmf,mynn_edmf_dd
+ character(len=StrKIND),pointer:: pbl_scheme,sfclayer_scheme,pbl_interval,convection_scheme
+ integer,pointer:: mynn_edmf,mynn_edmf_dd,nThreads
  integer,pointer:: nVertLevels,nCellsSolve
- integer:: edmf,edmf_dd
+ integer:: edmf,edmf_dd,threads
  logical:: supported
  character(len=StrKIND):: reason
 
  call pbl_gas_finalize()
 
- nullify(requested,pbl_scheme,sfclayer_scheme,pbl_interval,mynn_edmf,mynn_edmf_dd)
+ nullify(requested,pbl_scheme,sfclayer_scheme,pbl_interval,convection_scheme,mynn_edmf,mynn_edmf_dd,nThreads)
  call mpas_pool_get_config(block%configs,'config_micm_pbl_transport',requested)
  call mpas_pool_get_config(block%configs,'config_pbl_scheme'        ,pbl_scheme)
  call mpas_pool_get_config(block%configs,'config_sfclayer_scheme'   ,sfclayer_scheme)
  call mpas_pool_get_config(block%configs,'config_pbl_interval'      ,pbl_interval)
+ call mpas_pool_get_config(block%configs,'config_convection_scheme' ,convection_scheme)
  call mpas_pool_get_config(block%configs,'config_mynn_edmf'         ,mynn_edmf)
  call mpas_pool_get_config(block%configs,'config_mynn_edmf_dd'      ,mynn_edmf_dd)
  if(.not.associated(requested)) return
@@ -119,7 +120,11 @@
  edmf_dd = 0
  if(associated(mynn_edmf)   ) edmf    = mynn_edmf
  if(associated(mynn_edmf_dd)) edmf_dd = mynn_edmf_dd
- call pbl_gas_capability(pbl_scheme,sfclayer_scheme,pbl_interval,supported,reason)
+!the resolved schemes (physics_namelist_check has replaced 'suite' before this runs):
+ call mpas_pool_get_dimension(block%dimensions,'nThreads',nThreads)
+ threads = 1
+ if(associated(nThreads)) threads = nThreads
+ call pbl_gas_capability(pbl_scheme,sfclayer_scheme,pbl_interval,convection_scheme,threads,supported,reason)
  call tracer_transport_check_capability('PBL',.true.,pbl_scheme,supported,reason)
  enabled = trim(pbl_scheme) /= 'off'
  if(enabled) call mpas_log_write('[transport] PBL: gas operator refreshed at each PBL call (config_pbl_interval = '// &
@@ -148,12 +153,16 @@
  end subroutine pbl_gas_init
 
 !=================================================================================================================
- pure subroutine pbl_gas_capability(pbl_scheme,sfclayer_scheme,pbl_interval,supported,reason)
+ pure subroutine pbl_gas_capability(pbl_scheme,sfclayer_scheme,pbl_interval,convection_scheme,nthreads,supported, &
+                                     reason)
 !=================================================================================================================
 !qualified PBL configurations for MICM gas transport: YSU (P3) and MYNN in every mass-flux mode (P4), at any
 !PBL interval (P5: the held operator is applied every step, pbl_gas_begin_step). pbl_interval is accepted
-!so interval-specific restrictions can be stated here; none is needed today.
- character(len=*),intent(in):: pbl_scheme,sfclayer_scheme,pbl_interval
+!so interval-specific restrictions can be stated here; none is needed today. Qualified for convection-resolving
+!configurations: parameterized convection does not carry MICM gases until #41 (its plan lifts this gate), and
+!OpenMP threading of the transport is not qualified.
+ character(len=*),intent(in):: pbl_scheme,sfclayer_scheme,pbl_interval,convection_scheme
+ integer,intent(in):: nthreads
  logical,intent(out):: supported
  character(len=*),intent(out):: reason
 
@@ -174,6 +183,13 @@
     if(trim(sfclayer_scheme) == 'off') then
        supported = .false.
        reason    = 'an active PBL scheme requires a surface layer scheme'
+    elseif(trim(convection_scheme) /= 'off') then
+       supported = .false.
+       reason    = 'parameterized convection does not transport MICM gases yet (#41); set '// &
+                   'config_convection_scheme = ''off'' (convection-resolving configurations)'
+    elseif(nthreads > 1) then
+       supported = .false.
+       reason    = 'OpenMP threading is not qualified for MICM gas transport; run with one thread'
     endif
  endif
 
