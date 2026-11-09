@@ -2439,6 +2439,11 @@
                      description="Vertically mix every independently transported MICM gas with the active PBL scheme's scalar exchange (YSU at the default PBL interval; other configurations stop at initialization). See docs/plans/pbl-transport.md."
                      possible_values=".true. or .false."/>
 
+                <nml_option name="config_micm_transport_budget" type="logical" default_value="false" in_defaults="false"
+                     units="-"
+                     description="Log the domain budget of each transported MICM gas for each transport process every model step: masses before and after, increment, largest column residual, extrema, active columns, operator refresh time and time step (a diagnostic; one set of MPI reductions per step). See check_transport_budget.py."
+                     possible_values=".true. or .false."/>
+
                 <nml_option name="config_urban_physics" type="logical" default_value="false" in_defaults="false"
                      units="-"
                      description="logical for turn on/off the urban physics parameterization"

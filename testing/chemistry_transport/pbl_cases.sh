@@ -28,7 +28,8 @@ PY
 stage() {
     # stage CASE INIT MODEL DURATION KEY=VALUE...  namelist options: pbl, sfclayer, transport
     # (default leaves config_micm_pbl_transport unset), pblmix, pbl_interval, mynn_edmf, mynn_edmf_dd,
-    # mynn_edmf_output; extra_output adds comma-separated fields to the output stream.
+    # mynn_edmf_output, budget (config_micm_transport_budget); extra_output adds comma-separated fields to
+    # the output stream.
     local case_dir=$run_root/$1 init=$2 exe=$3 duration=$4
     mkdir -p "$case_dir"
     for name in namelist.atmosphere streams.atmosphere stream_list.atmosphere.output \
@@ -75,6 +76,8 @@ if 'pbl_interval' in options:
 for key in ('mynn_edmf', 'mynn_edmf_dd', 'mynn_edmf_output'):
     if key in options:
         setopt(f'config_{key}', options[key], 'physics')
+if 'budget' in options:
+    setopt('config_micm_transport_budget', options['budget'], 'physics')
 setopt('config_lnox_source_rate', '0.0', 'lnox')
 setopt('config_tuvx_config_file', "''", 'photolysis')
 setopt('config_tuvx_top_extension', '.false.', 'photolysis')

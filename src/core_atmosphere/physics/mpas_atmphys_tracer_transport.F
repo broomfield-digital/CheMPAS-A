@@ -6,8 +6,9 @@
 !
 !=================================================================================================================
  module mpas_atmphys_tracer_transport
- use mpas_kind_types,only: RKIND
- use mpas_derived_types,only: block_type,mpas_pool_type,MPAS_LOG_CRIT
+ use mpas_kind_types,only: RKIND,StrKIND
+ use mpas_derived_types,only: block_type,mpas_pool_type,MPAS_LOG_CRIT,dm_info
+ use mpas_dmpar,only: mpas_dmpar_sum_real_array,mpas_dmpar_max_real_array,mpas_dmpar_min_real_array
  use mpas_pool_routines,only: mpas_pool_get_array,mpas_pool_get_dimension
  use mpas_log,only: mpas_log_write
  use mpas_atmphys_tracer_column,only: transport_budget_t,budget_reset,budget_accumulate,column_dry_mass
@@ -30,7 +31,8 @@
           tracer_transport_buffer_size,      &
           tracer_transport_assemble_columns, &
           tracer_transport_add_tend,         &
-          tracer_transport_budget
+          tracer_transport_budget,           &
+          tracer_transport_log_budget
 
 
 !Vertical transport of independently transported MICM gases by PBL mixing and convection (shared foundation,
@@ -315,6 +317,78 @@
  endif
 
  end function tracer_transport_budget
+
+!=================================================================================================================
+ subroutine tracer_transport_log_budget(dminfo,time_s)
+!=================================================================================================================
+!log the domain budget of the last assembly (config_micm_transport_budget): one line per enabled process and
+!gas, reduced over all ranks, so every rank must call this. time_s is the model time [s] since the start of
+!the run. testing/chemistry_transport/check_transport_budget.py reads the lines.
+ type(dm_info),intent(in):: dminfo
+ real(kind=RKIND),intent(in):: time_s
+ integer:: n
+
+ if(.not.tracer_transport_enabled()) return
+ do n = 1, nTransport
+    if(pbl_gas_enabled()) call log_budget_line('PBL',n,bud_pbl(n),dminfo,time_s)
+    if(cu_gas_enabled() ) call log_budget_line('CU' ,n,bud_cu (n),dminfo,time_s)
+ enddo
+
+ end subroutine tracer_transport_log_budget
+
+!=================================================================================================================
+ subroutine log_budget_line(process,n,b,dminfo,time_s)
+!=================================================================================================================
+!sums: masses, increment and active columns; maxima: residual, qmax, refresh time and dt (a rank without
+!active columns holds -1 and 0 for the last two); minimum: qmin. rel = increment/before.
+ character(len=*),intent(in):: process
+ integer,intent(in):: n
+ type(transport_budget_t),intent(in):: b
+ type(dm_info),intent(in):: dminfo
+ real(kind=RKIND),intent(in):: time_s
+ real(kind=RKIND):: s(4),x(4),mn(1),rs(4),rx(4),rmn(1),rel
+ character(len=2*StrKIND):: line
+
+ s  = (/b%mass_before,b%mass_after,b%increment,real(b%active_columns,kind=RKIND)/)
+ x  = (/b%residual,b%qmax,b%refresh_time,b%dt_applied/)
+ mn = (/b%qmin/)
+ call mpas_dmpar_sum_real_array(dminfo,4,s,rs)
+ call mpas_dmpar_max_real_array(dminfo,4,x,rx)
+ call mpas_dmpar_min_real_array(dminfo,1,mn,rmn)
+ rel = rs(3)/max(abs(rs(1)),tiny(1._RKIND))
+
+ write(line,'(a)') '[transport] budget '//process//' t='//r2s(time_s)//' gas='//i2s(n)// &
+       ' scalar='//i2s(transport_to_scalar(n))//' before='//r2s(rs(1))//' after='//r2s(rs(2))// &
+       ' increment='//r2s(rs(3))//' rel='//r2s(rel)//' residual='//r2s(rx(1))//' qmin='//r2s(rmn(1))// &
+       ' qmax='//r2s(rx(2))//' columns='//i2s(nint(rs(4)))//' refresh='//r2s(rx(3))//' dt='//r2s(rx(4))
+ call mpas_log_write(trim(line))
+
+ end subroutine log_budget_line
+
+!=================================================================================================================
+ function r2s(x) result(s)
+!=================================================================================================================
+!full-precision real, no leading blanks, three-digit exponent (parsed by Python's float).
+ real(kind=RKIND),intent(in):: x
+ character(len=:),allocatable:: s
+ character(len=32):: buf
+
+ write(buf,'(es25.16e3)') x
+ s = trim(adjustl(buf))
+
+ end function r2s
+
+!=================================================================================================================
+ function i2s(i) result(s)
+!=================================================================================================================
+ integer,intent(in):: i
+ character(len=:),allocatable:: s
+ character(len=16):: buf
+
+ write(buf,'(i0)') i
+ s = trim(buf)
+
+ end function i2s
 
 !=================================================================================================================
  end module mpas_atmphys_tracer_transport

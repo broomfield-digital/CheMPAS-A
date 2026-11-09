@@ -23,7 +23,7 @@
 
  use mpas_atmphys_constants, only: R_d,R_v,degrad
  use mpas_atmphys_tracer_transport, only: tracer_transport_enabled,tracer_transport_assemble, &
-                                          tracer_transport_add_tend
+                                          tracer_transport_add_tend,tracer_transport_log_budget
  use mpas_timer, only: mpas_timer_start, mpas_timer_stop
 
  implicit none
@@ -126,6 +126,7 @@
                                   radt_sw_scheme
 
  integer:: i,iCell,k,n
+ logical,pointer:: budget_log
  integer,pointer:: index_qv,index_qc,index_qr,index_qi,index_qs
  integer,pointer:: index_nc,index_ni,index_nifa,index_nwfa
  integer,pointer:: nCells,nCellsSolve,nEdges,nEdgesSolve
@@ -261,6 +262,12 @@
  if(tracer_transport_enabled()) then
     call tracer_transport_assemble(mesh,state,dt)
     call tracer_transport_add_tend(mass,tend_scalars)
+    !optional per-step domain budget (config_micm_transport_budget; every rank takes part in the reductions):
+    nullify(budget_log)
+    call mpas_pool_get_config(configs,'config_micm_transport_budget',budget_log)
+    if(associated(budget_log)) then
+       if(budget_log) call tracer_transport_log_budget(block%domain%dminfo,model_time_s(block%domain%clock))
+    endif
  endif
 
 !clean up any pointers that were allocated with zero size before the call to physics_get_tend_work:
@@ -288,6 +295,26 @@
  deallocate(tend_th)
 
  end subroutine physics_get_tend
+
+!=================================================================================================================
+ real(kind=RKIND) function model_time_s(clock)
+!=================================================================================================================
+!model time [s] since the start of this run (restarts start again at 0), as physics_driver's xtime_s.
+ use mpas_timekeeping,only: MPAS_Clock_type,MPAS_Time_type,MPAS_TimeInterval_type,MPAS_START_TIME,MPAS_NOW, &
+                            mpas_get_clock_time,mpas_get_timeInterval,operator(-)
+ type(MPAS_Clock_type),intent(in):: clock
+ type(MPAS_Time_type):: start_time,now
+ type(MPAS_TimeInterval_type):: elapsed
+ integer:: s,s_n,s_d,ierr
+
+ start_time = mpas_get_clock_time(clock,MPAS_START_TIME,ierr)
+ now        = mpas_get_clock_time(clock,MPAS_NOW,ierr)
+ elapsed    = now - start_time
+ call mpas_get_timeInterval(interval=elapsed,S=s,S_n=s_n,S_d=s_d,ierr=ierr)
+ model_time_s = real(s,kind=RKIND)
+ if(s_d /= 0) model_time_s = model_time_s + real(s_n,kind=RKIND)/real(s_d,kind=RKIND)
+
+ end function model_time_s
 
  !=================================================================================================================
  subroutine post_physics_get_tend(configs,state,diag,tend)
