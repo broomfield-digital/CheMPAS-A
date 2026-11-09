@@ -43,7 +43,7 @@ The "transport off is unchanged" comparisons use these reference executables:
 | ysu | 21 | The gates stop the model. With transport, non-gas fields are bitwise identical to transport off, and gas mass drifts ≤ 4.1e-16. Convective mixes more than stable. Transport off is bitwise identical to pre_p3 |
 | mynn | 37 | The same for local diffusion, updrafts, and updrafts with downdrafts. Transport off is bitwise identical to pre_p4 |
 | cadence | 3 | The PBL and surface schemes run 20 times in 20 steps with `'none'` or an interval of `config_dt`, and 7 times with 9 s (DT_PBL = 9 s). An interval of `config_dt` is bitwise identical to `'none'`. The default cadence is bitwise identical to pre_p5 |
-| intervals | 4 | YSU and MYNN at 9 s, YSU at 10 s: non-gas fields bitwise, gas mass conserved, budget max \|rel\| 3.3e-16. PBL off with transport requested runs and logs transport as off |
+| intervals | 4 | YSU and MYNN at 9 s: non-gas fields bitwise, gas mass conserved. With YSU at 10 s too, budget max \|rel\| 3.3e-16. PBL off with transport requested runs and logs transport as off |
 | restart | 15 | Five restarts on a PBL-interval boundary are bitwise identical to the continuous runs (YSU and MYNN, `'none'` and 9 s, and native MPAS). The restart off the boundary differs, as documented |
 | chemistry-intervals | 8 | YSU and MYNN with chemistry every 3, 9 and 21 s: non-gas fields bitwise, nitrogen and odd-oxygen drift ≤ 4.9e-16, budget max \|rel\| 1.1e-15 |
 | mpi | 14 | YSU and MYNN on 1, 2 and 4 ranks against 8: every output field bitwise identical |

@@ -8,10 +8,12 @@ MYNN gas transport with its local diffusion, updrafts and downdrafts (see
 intervals, restart, chemistry intervals, MPI and the gate against parameterized
 convection (see the [P5 plan](#p5-plan-pbl-intervals-restart-and-mpi)), and P6,
 the GNU Fortran eight-rank qualification (see
-[P6](#p6-gnu-fortran-eight-rank-qualification-implemented)). The work completes
-for convection-resolving configurations, with parameterized convection off, the
-first science target being the resolved supercell, when the final qualification
-run is recorded in P6. Qualification with
+[P6](#p6-gnu-fortran-eight-rank-qualification-implemented)). The work is
+complete for convection-resolving configurations, with parameterized convection
+off, the first science target being the resolved supercell. The final
+qualification passed all 15 checks on 2026-11-09
+([results](../../testing/chemistry_transport/results/pbl-qualification-gnu-20261109/README.md)).
+Qualification with
 parameterized convection belongs to the convective transport plan (#41); the
 Clang/Flang build is deferred. Users start from the
 [user guide](../chempas/guides/pbl-gas-transport.md).
@@ -167,12 +169,15 @@ deterministic application, and retained license notices. An edited ignored
   Commits `d90b9fd7` (native PBL cadence repair), `25d09c38`, `f62f5423`,
   `d2ac0898`, `72fb7399`, `a9a7d2c7`, `d4e7c954` and `bdf8aea2`; see the
   [P5 plan](#p5-plan-pbl-intervals-restart-and-mpi).
-- [ ] P6: GCC/gfortran eight-rank results, supported-configuration table
+- [x] P6: GCC/gfortran eight-rank results, supported-configuration table
   (convection-resolving configurations), reproducible fixtures, and user
-  configuration documentation. The Clang/Flang build is deferred (decided
-  2026-11-08): development and the first science runs are on Linux with
-  gfortran. Flang qualification, including the absent-optional pattern, follows
-  when a Flang platform is in use.
+  configuration documentation. Commits `ca9653d3` (reactive regression),
+  `8692a86b` (fine grid), `ebc5c322` (runner), `e429e52c` (docs and user
+  guide), `a8629926`, `488175bb` and `bf3f1abf` (review fixes) and `c18f2a8c`
+  (results); see [P6](#p6-gnu-fortran-eight-rank-qualification-implemented).
+  The Clang/Flang build is deferred (decided 2026-11-08): development and the
+  first science runs are on Linux with gfortran. Flang qualification, including
+  the absent-optional pattern, follows when a Flang platform is in use.
 
 Coupled PBL + parameterized convection + MICM qualification is not a completion
 criterion of this plan. It belongs to the convective transport plan (#41), after
@@ -1174,10 +1179,31 @@ precision without OpenMP, on eight ranks.
 ### Fixtures and results
 
 `testing/chemistry_transport/run_pbl_qualification.sh` runs every check in
-order and writes a summary and a manifest. The final run is recorded in
-⟨TBD: results link⟩.
+order and writes a summary and a manifest. It copies the model and the
+reference executables first, and fails the run if the source or any executable
+changes before the end. The final run, at `bf3f1abf` on 2026-11-09, is recorded
+in
+[results/pbl-qualification-gnu-20261109](../../testing/chemistry_transport/results/pbl-qualification-gnu-20261109/README.md),
+with the manifest, the summary and every check's log. It passed all 15 checks
+in 3 h 52 min, and none skipped a part.
 
-⟨TBD: results table⟩
+| Check | Result |
+| --- | --- |
+| Unit tests | 42 Python checker tests, 4 tool self-tests, 12 Fortran unit programs |
+| MMM-physics patches | apply, repeat as a no-op, revert cleanly |
+| Wiring | the LNOx gases reach physics; host-bound H2O is excluded |
+| Realized increment | matches the request in every advection mode (≤ 5.3e-23) |
+| YSU, MYNN | gates stop the model; non-gas fields bitwise with and without transport; gas mass drift ≤ 4.1e-16; transport off bitwise identical to the pre-P3 and pre-P4 executables |
+| Cadence | 20 PBL calls in 20 steps for `'none'` and `config_dt`, 7 for 9 s; the default cadence bitwise identical to the pre-P5 executable |
+| Intervals | YSU and MYNN at 9 s: non-gas fields bitwise; with YSU at 10 s, budget max \|rel\| ≤ 3.3e-16 |
+| Restart | five restarts on an interval boundary bitwise identical; the off-boundary restart differs, as expected |
+| Chemistry intervals | 3, 9 and 21 s: nitrogen and odd-oxygen drift ≤ 4.9e-16 |
+| MPI | 1, 2 and 4 ranks against 8: every output field bitwise identical |
+| Reactive | see [Reactive regression](#reactive-regression) |
+| Fine grid | see [Finer vertical grid](#finer-vertical-grid) |
+| Smoke, 60 s | the standard LNOx supercell on eight ranks; odd-oxygen drift 1.2e-16 |
+
+The fine-grid and reactive numbers below are from this run.
 
 ### Finer vertical grid
 

@@ -53,8 +53,10 @@ The model log then reports, during initialization:
 | MPI | Any rank count |
 
 The qualification (`testing/chemistry_transport/run_pbl_qualification.sh`) runs
-the idealized supercell on eight ranks with GNU Fortran. A Clang/Flang build
-has not been qualified yet.
+the idealized supercell on eight ranks with GNU Fortran. Its final run passed
+all 15 checks; see the
+[results](../../../testing/chemistry_transport/results/pbl-qualification-gnu-20261109/README.md).
+A Clang/Flang build has not been qualified yet.
 
 ## What stops the model
 
