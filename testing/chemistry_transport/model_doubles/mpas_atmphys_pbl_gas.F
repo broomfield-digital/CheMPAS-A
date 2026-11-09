@@ -14,6 +14,11 @@
  implicit none
  private
  public:: pbl_gas_init,pbl_gas_enabled,pbl_gas_active,pbl_gas_apply,pbl_gas_finalize
+!the rest of the production interface used by the PBL and physics drivers and transport assembly, as
+!no-ops (the double applies its own known operator, whatever the PBL scheme stores):
+ public:: pbl_gas_cache_store_moist_column,pbl_gas_cache_store_mynn_column,pbl_gas_cache_store_mynn_plumes, &
+         pbl_gas_mynn_updrafts,pbl_gas_mynn_downdrafts,pbl_gas_cache_refreshed,pbl_gas_begin_step,      &
+         pbl_gas_refresh_time
 
  integer,parameter:: MODE_OFF = 0, MODE_SOURCE = 1, MODE_DIFFUSION = 2
  real(kind=RKIND),parameter:: S0 = 1.e-13_RKIND           ! [kg/kg/s]
@@ -74,5 +79,48 @@
 
  subroutine pbl_gas_finalize
  end subroutine pbl_gas_finalize
+
+ subroutine pbl_gas_cache_store_moist_column(iCell,kzq,rho,qv,dz,ok)
+ integer,intent(in):: iCell
+ real(kind=RKIND),intent(in),dimension(:):: kzq,rho,qv,dz
+ logical,intent(out):: ok
+ ok = .true.
+ end subroutine pbl_gas_cache_store_moist_column
+
+ subroutine pbl_gas_cache_store_mynn_column(iCell,kh,rho,qv,dz,ok)
+ integer,intent(in):: iCell
+ real(kind=RKIND),intent(in),dimension(:):: kh,rho,qv,dz
+ logical,intent(out):: ok
+ ok = .true.
+ end subroutine pbl_gas_cache_store_mynn_column
+
+ subroutine pbl_gas_cache_store_mynn_plumes(iCell,aw_up,ent_up,rho,qv,dz,ok,aw_dn,ent_dn)
+ integer,intent(in):: iCell
+ real(kind=RKIND),intent(in),dimension(:,:):: aw_up,ent_up
+ real(kind=RKIND),intent(in),dimension(:):: rho,qv,dz
+ logical,intent(out):: ok
+ real(kind=RKIND),intent(in),dimension(:,:),optional:: aw_dn,ent_dn
+ ok = .true.
+ end subroutine pbl_gas_cache_store_mynn_plumes
+
+ logical function pbl_gas_mynn_updrafts()
+ pbl_gas_mynn_updrafts = .false.
+ end function pbl_gas_mynn_updrafts
+
+ logical function pbl_gas_mynn_downdrafts()
+ pbl_gas_mynn_downdrafts = .false.
+ end function pbl_gas_mynn_downdrafts
+
+ subroutine pbl_gas_cache_refreshed(time_s,interval_s)
+ real(kind=RKIND),intent(in):: time_s,interval_s
+ end subroutine pbl_gas_cache_refreshed
+
+ subroutine pbl_gas_begin_step(dt)
+ real(kind=RKIND),intent(in):: dt
+ end subroutine pbl_gas_begin_step
+
+ real(kind=RKIND) function pbl_gas_refresh_time()
+ pbl_gas_refresh_time = -1._RKIND
+ end function pbl_gas_refresh_time
 
  end module mpas_atmphys_pbl_gas

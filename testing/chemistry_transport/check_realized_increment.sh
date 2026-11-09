@@ -10,7 +10,8 @@
 #    place of the production stub. The checkout's own build is untouched.
 # 2. Makes a horizontally uniform resting state from the baseline
 #    supercell_init.nc (make_resting_init.py) and an inert mechanism.
-# 3. Runs three 3-s steps for each advection mode and each double mode, and
+# 3. Runs three 3-s steps for each advection mode and each double mode (eight
+#    steps with chemistry every 3 and 7 steps: mono_chem3, mono_chem7, P5), and
 #    compares realized with requested increments (check_realized_increment.py),
 #    in two regimes: "rest" (eddy viscosity off, so the uniform state stays at
 #    rest and every layer is compared) and "moving" (the case's eddy viscosity
@@ -120,9 +121,11 @@ modes = {
     'mono_split':     dict(monotonic='.true.',  posdef='.false.', split='.true.',  steps='3'),
     'ordinary_split': dict(monotonic='.false.', posdef='.false.', split='.true.',  steps='3'),
     'mono_chem2':     dict(monotonic='.true.',  posdef='.false.', split='.false.', steps='1'),
+    'mono_chem3':     dict(monotonic='.true.',  posdef='.false.', split='.false.', steps='1', duration='00:00:24'),
+    'mono_chem7':     dict(monotonic='.true.',  posdef='.false.', split='.false.', steps='1', duration='00:00:24'),
 }
 m = modes[adv]
-setopt('config_run_duration', "'00:00:09'")
+setopt('config_run_duration', f"'{m.get('duration', '00:00:09')}'")
 setopt('config_monotonic', m['monotonic'])
 setopt('config_positive_definite', m['posdef'])
 setopt('config_split_dynamics_transport', m['split'])
@@ -132,7 +135,8 @@ setopt('config_tuvx_config_file', "''", group='photolysis')
 setopt('config_tuvx_top_extension', '.false.', group='photolysis')
 setopt('config_tuvx_upper_column_mode', "'none'", group='photolysis')
 setopt('config_tuvx_extension_file', "''", group='photolysis')
-setopt('config_chemistry_interval', '6.0' if adv == 'mono_chem2' else '0.0', group='chemistry')
+setopt('config_chemistry_interval', {'mono_chem2': '6.0', 'mono_chem3': '9.0', 'mono_chem7': '21.0'}.get(adv, '0.0'),
+       group='chemistry')
 setopt('config_j_no2_max', '0.01' if regime == 'fresh' else '0.0', group='photolysis')
 if regime in ('rest', 'fresh'):
     for name in ('config_h_mom_eddy_visc2', 'config_h_mom_eddy_visc4', 'config_v_mom_eddy_visc2',
@@ -175,7 +179,7 @@ run_case() {
 
 echo "== realized increments"
 for regime in rest moving; do
-    for adv in mono ordinary posdef mono_split ordinary_split mono_chem2; do
+    for adv in mono ordinary posdef mono_split ordinary_split mono_chem2 mono_chem3 mono_chem7; do
         for mode in source diffusion; do
             run_case "$regime" "$adv" "$mode"
         done
