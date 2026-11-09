@@ -7,7 +7,8 @@
 
  implicit none
  private
- public:: cu_gas_init,cu_gas_enabled,cu_gas_active,cu_gas_apply,cu_gas_finalize
+ public:: cu_gas_init,cu_gas_enabled,cu_gas_active,cu_gas_apply,cu_gas_finalize,cu_double_active
+ logical,save:: cu_double_active = .true.   ! .false.: no column is active (an all-inactive rank)
 
  contains
 
@@ -22,7 +23,7 @@
 
  logical function cu_gas_active(iCell)
  integer,intent(in):: iCell
- cu_gas_active = iCell <= 2
+ cu_gas_active = cu_double_active .and. iCell <= 2
  end function cu_gas_active
 
  subroutine cu_gas_apply(iCell,dt,m_d,q)

@@ -9,6 +9,8 @@ program test_tracer_transport_ops
    use mpas_kind_types, only: RKIND, I8KIND
    use unit_assert, only: check, finish
    use mpas_atmphys_tracer_transport
+   use mpas_atmphys_pbl_gas, only: pbl_double_active
+   use mpas_atmphys_cu_gas, only: cu_double_active
 
    implicit none
 
@@ -104,6 +106,24 @@ program test_tracer_transport_ops
    call check(bitwise_equal(tend(:,:,3:4), tend0(:,:,3:4)), 'cells beyond nCellsSolve keep every tendency bit')
    expect = tend0(SP1,:,1) + (q2(1,:,1) - scalars0(SP1,:,1))/dt*mass(:,1)
    call check(all(abs(tend(SP1,:,1) - expect) <= tol*maxval(abs(expect))), 'owned cells are still updated')
+
+   ! A rank whose columns are all inactive (P5 MPI decomposition): no tendency is touched and the budgets are
+   ! empty, with nothing divided by its zero mass.
+   call tracer_transport_teardown()
+   call tracer_transport_setup([SP1, SP2], nz, nc)
+   pbl_double_active = .false.
+   cu_double_active = .false.
+   tend = tend0
+   call tracer_transport_assemble_columns(scalars, zz, rho_zz, zgrid, area, dt)
+   call tracer_transport_add_tend(mass, tend)
+   call check(bitwise_equal(tend, tend0), 'an all-inactive rank keeps every tendency bit')
+   b = tracer_transport_budget(TRANSPORT_PBL, 1)
+   call check(b%active_columns == 0 .and. b%mass_before == 0.0_RKIND .and. b%mass_after == 0.0_RKIND .and. &
+              b%increment == 0.0_RKIND .and. b%residual == 0.0_RKIND, 'an all-inactive rank has an empty PBL budget')
+   b = tracer_transport_budget(TRANSPORT_CU, 2)
+   call check(b%active_columns == 0 .and. b%increment == 0.0_RKIND, 'an all-inactive rank has an empty CU budget')
+   pbl_double_active = .true.
+   cu_double_active = .true.
 
    call tracer_transport_teardown()
    call finish('test_tracer_transport_ops')

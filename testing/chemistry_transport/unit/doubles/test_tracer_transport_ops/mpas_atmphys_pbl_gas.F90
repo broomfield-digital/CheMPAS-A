@@ -7,7 +7,8 @@
  implicit none
  private
  public:: pbl_gas_init,pbl_gas_enabled,pbl_gas_active,pbl_gas_apply,pbl_gas_finalize, &
-         pbl_gas_begin_step,pbl_gas_refresh_time
+         pbl_gas_begin_step,pbl_gas_refresh_time,pbl_double_active
+ logical,save:: pbl_double_active = .true.  ! .false.: no column is active (an all-inactive rank)
 
  contains
 
@@ -22,7 +23,7 @@
 
  logical function pbl_gas_active(iCell)
  integer,intent(in):: iCell
- pbl_gas_active = mod(iCell,2) == 1
+ pbl_gas_active = pbl_double_active .and. mod(iCell,2) == 1
  end function pbl_gas_active
 
  subroutine pbl_gas_apply(iCell,dt,m_d,q)
