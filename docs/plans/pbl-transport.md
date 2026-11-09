@@ -5,7 +5,11 @@ and tendency proof (`7ae5f39d` shared, `0eb2c8ad`), P3, YSU gas transport at the
 default PBL interval (see [P3](#p3-ysu-gas-pbl-transport-implemented)), and P4,
 MYNN gas transport with its local diffusion, updrafts and downdrafts (see
 [P4](#p4-mynn-gas-pbl-transport-implemented)), are implemented. Intervals/restart
-and toolchain qualification (P5–P6) are pending.
+and toolchain qualification (P5–P6) are pending. The work completes for
+convection-resolving configurations, with parameterized convection off, the
+first science target being the resolved supercell. Qualification with
+parameterized convection belongs to the convective transport plan (#41); see the
+[P5 plan](#p5-plan-pbl-intervals-restart-and-mpi).
 
 - Tracking issue: [CheMPAS-A #40](https://github.com/NCAR/CheMPAS-A/issues/40).
 - Branch: `chempas-a-pbl`, from `chempas-a` at
@@ -116,6 +120,7 @@ is a supported zero-transport case; an active PBL with surface layer off is not.
 | MYNN with updraft EDMF | Export/reuse plume geometry and entrainment coefficients; recompute plume concentrations from current gas profiles, include plume tracer flux and compensating environment transport together with diffusion. | Updraft-only and combined diffusion/EDMF budgets and nonnegativity. `edmf_a`, `edmf_w`, or `exch_h` alone are not the complete operator. |
 | MYNN downdraft EDMF | Extend the adapter through the downdraft pathway and its environmental compensation. | Remains explicitly unsupported until downdraft tracer budgets pass; do not silently use the updraft-only operator. |
 | Nondefault PBL intervals | Diagnose and repair the alarm/`dt_pbl` contract as a separately reviewable change before qualification. Specify coefficient refresh times and per-step gas application. | Initially reject nondefault intervals when gas PBL transport is enabled. Lift the restriction only after interval/restart tests and native-meteorology regressions establish the intended cadence. Disabled gas transport must not acquire an incidental cadence change. |
+| Parameterized convection active | Not qualified here. The native convection schemes do not carry MICM gases, so PBL mixing alone would leave them trapped below cloud base. The PBL-then-convection tendency sequence of the shared interface stays ready for #41. | Reject gas PBL transport with any active convection scheme, including scale-aware Grell-Freitas in the `convection_permitting` suite. The convective transport plan (#41) lifts the restriction after its coupled PBL + convection + MICM qualification. |
 
 Do not enable WRF chemistry/emissions macros globally. Adapt passive-gas
 algorithms with no deposition velocity, fire enhancement, or imposed positive
@@ -150,12 +155,20 @@ deterministic application, and retained license notices. An edited ignored
   `a68d7598`, `c5e144da`, `9eca3f99`, `0c21a646`, `2181961a`, `872e9255` and
   `fd9ccbe8`; see
   [P4](#p4-mynn-gas-pbl-transport-implemented).
-- [ ] P5: nondefault interval contract, cache restart behavior, MPI/halo checks,
-  and coupled PBL/convection/chemistry qualification after #41 is available.
-  Planned as P5a (PBL-only) and P5b (coupled, after #41); see the
-  [P5 plan](#p5-plan-pbl-intervals-restart-and-mpi-pbl-only-part).
-- [ ] P6: GCC/gfortran and Clang/Flang eight-rank results, supported-configuration
-  table, reproducible fixtures, and user configuration documentation.
+- [ ] P5: nondefault interval contract, cache restart behavior, chemistry
+  intervals, MPI/halo checks, and the gate against parameterized convection; see
+  the [P5 plan](#p5-plan-pbl-intervals-restart-and-mpi). The PBL-interval repair
+  is in `d90b9fd7`.
+- [ ] P6: GCC/gfortran eight-rank results, supported-configuration table
+  (convection-resolving configurations), reproducible fixtures, and user
+  configuration documentation. The Clang/Flang build is deferred (decided
+  2026-11-08): development and the first science runs are on Linux with
+  gfortran. Flang qualification, including the absent-optional pattern, follows
+  when a Flang platform is in use.
+
+Coupled PBL + parameterized convection + MICM qualification is not a completion
+criterion of this plan. It belongs to the convective transport plan (#41), after
+its stages, because that is where the convective gas operator is added.
 
 Likely files: `Registry.xml`; chemistry initialization/runtime registration in
 `chemistry/musica/mpas_atm_chemistry.F`; the new physics helper; physics driver,
@@ -705,7 +718,8 @@ under `~/Data/CheMPAS-A/p4-dev/`: `lnox-ysu-off`, `lnox-ysu-on` and
 - `exch_q(k)` is on the k/k+1 interface, while YSU's `exch_h(k+1)` is on the
   same interface by the bottom-face convention. MYNN (P4) must not copy one
   convention into the other.
-- The absent-optional pattern is verified only with gfortran (P6: flang).
+- The absent-optional pattern is verified only with gfortran. Flang is deferred
+  beyond P6 (see the P6 checklist item).
 - Restart: by construction, every step at the default interval refreshes the
   operator before it is used. A restart-versus-continuous run, and a stamp on
   the cache's step, belong with the P5 interval contract.
@@ -907,13 +921,19 @@ before a comment correction), with GNU on eight ranks, kept outside the reposito
   test's layer-budget reference reuses the plume routines it checks.
 - `test_apply_mmm_patches.sh` stops without a FAIL line if its mtime loop fails.
 
-## P5 plan: PBL intervals, restart and MPI (PBL-only part)
+## P5 plan: PBL intervals, restart and MPI
 
-P5 splits in two. The coupled PBL/convection/MICM qualification needs the
-convective transport of #41, whose stages C1–C6 are not implemented yet; it
-stays open as P5b. This plan covers P5a, which the PBL transport can
-qualify alone: nondefault PBL intervals, restart, chemistry intervals and MPI
-decomposition.
+P5 covers what the PBL transport can qualify alone: nondefault PBL intervals,
+restart, chemistry intervals, MPI decomposition, and a gate against
+parameterized convection.
+
+The first science target is the resolved supercell: about 540 m spacing, with
+`config_convection_scheme = 'off'`. Resolved advection carries the gases through
+the storm and no convection scheme runs, so the PBL work completes without the
+convective transport of #41. Coupling with parameterized convection moves to
+#41's plan (decided 2026-11-08). An earlier draft split P5 into P5a (PBL-only)
+and P5b (coupled, after #41); the commits made under that draft keep the P5a
+label.
 
 ### Audit (2026-11-08)
 
@@ -993,8 +1013,16 @@ right. The options:
    decomposition with ranks whose columns are all inactive (PBL off in a region is
    not available, so a rank count high enough to leave a rank with only
    zero-exchange columns, or a unit test of an all-inactive rank).
-7. **Documentation**: the P5a section, the gate table, and the upstream report
-   text for the native defect (filing it is your call).
+7. **Parameterized convection gate.** Stop at initialization when
+   `config_micm_pbl_transport` is set and the resolved `config_convection_scheme`
+   is not `'off'`, with a message naming #41. This includes the scale-aware
+   Grell-Freitas of the `convection_permitting` suite. Tests: a unit test of
+   `pbl_gas_capability` with each convection scheme and `'off'`; an in-model gate
+   case (YSU with a convection scheme stops with the message); the resolved
+   supercell (`'off'`) still runs.
+8. **Documentation**: the P5 section, the gate table, the supported
+   configurations (convection-resolving, with parameterized convection off), and
+   the upstream report text for the native defect (filing it is your call).
 
 ### Progress
 
@@ -1013,9 +1041,9 @@ right. The options:
   9 s run differs from the every-step run by at most 1.1e-3 K in θ and 2 m in the
   PBL height. Gas transport still rejects nondefault intervals until Task 3.
 
-Out of scope here: P5b coupling with #41, OpenMP thread-private buffers (the
-builds use `OPENMP=false`; noted for P6 with the Clang/Flang builds), and the
-P3/P4 items deferred to P6.
+Out of scope here: coupling with parameterized convection (#41's plan), OpenMP
+thread-private buffers (the builds use `OPENMP=false`; noted for P6), the
+deferred Clang/Flang build, and the P3/P4 items deferred to P6.
 
 ## Verification and completion criteria
 
@@ -1032,8 +1060,8 @@ results tracked alongside this plan.
 | Column physics | Nonuniform dry density and layer spacing; uniform profiles; isolated lower/middle/top pulses; sharp gradients; zero and near-zero species; diffusion/nonlocal components separately; zero coefficients and large stable timesteps. Check every species, not just a sum over gases. Compare diffusion against an independently assembled matrix or analytic constant-coefficient mode. |
 | Active PBL | Stable and convective boundary-layer fixtures with YSU and each qualified MYNN mode; show nonzero exchange and redistribution of every gradient tracer. Keep convection and chemical reactions off initially, with an inert MICM mechanism still loaded. |
 | Time/parallel/restart | Repeat many updates with chemistry intervals of 1, 3, and 7 model steps; test qualified physics intervals separately, including no-mixing transitions. Compare one and eight ranks by `indexToCellID`, include ranks with no active columns, and restart between refresh times. Check thread-private buffers if OpenMP is enabled. |
-| Coupled/regression | Reactive ABBA and Chapman/NOx cases, then PBL+convection+MICM. Check transport-only budgets before chemistry and reaction invariants afterwards. Compare disabled transport to the unmodified base, including native meteorology. Exercise each supported scalar advection setting. |
-| Toolchains/output | Separate double-precision GCC/gfortran and Clang/Flang builds of the full pinned CheMPAS-A/MUSICA stack; eight-rank NetCDF runs in both. A build of plain MPAS or a prior GCC-only chemistry run does not satisfy this gate. |
+| Coupled/regression | Reactive ABBA and Chapman/NOx cases, then the resolved supercell LNOx case with PBL transport. Check transport-only budgets before chemistry and reaction invariants afterwards. Compare disabled transport to the unmodified base, including native meteorology. Exercise each supported scalar advection setting. PBL + parameterized convection + MICM is qualified under #41, not here. |
+| Toolchains/output | A double-precision GCC/gfortran build of the full pinned CheMPAS-A/MUSICA stack, with eight-rank NetCDF runs. A build of plain MPAS or a chemistry run from before the transport work does not satisfy this gate. A Clang/Flang build is deferred until a Flang platform is in use. |
 
 Initial double-precision acceptance thresholds (freeze them with fixtures before
 implementation; justify any later changes):
@@ -1109,6 +1137,6 @@ not qualify PBL transport. Chemical inventory drift is reported separately
 from the isolated transport-budget thresholds above.
 
 Complete #40 only after the supported subset is explicitly listed, all required
-tests for that subset pass on both toolchains, remaining configurations fail
+tests for that subset pass with GCC/gfortran, remaining configurations fail
 clearly, and the result manifest and implementation commit IDs are recorded
 here. No transport test results are claimed by this planning commit.
