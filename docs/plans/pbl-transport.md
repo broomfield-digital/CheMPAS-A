@@ -619,6 +619,85 @@ ranks. They are kept outside the repository, under
 `smoke-600s-final` and `wiring-final`. The pre-P3 executable for comparison is
 `pre-p3-atmosphere_model` (revision `50f2666c`).
 
+### Standard LNOx case with YSU gas transport (2026-11-08)
+
+The standard 2-h supercell LNOx case was run with YSU and the Monin-Obukhov
+surface layer, once with gas transport off and once with it on. The case has
+lightning on, the full mechanism and 10-min output. The runs were at
+`872e9255`, on eight ranks. The baseline has the PBL off, so the meteorology of
+these runs differs from it.
+
+Tools, in `testing/chemistry_transport/`:
+
+- `run_supercell_lnox_pbl.sh BASELINE_DIR RUN_DIR off|on [MODEL [ysu|mynn]]`
+  makes the runs.
+- `plot_pbl_transport_diff.py` draws on − off:
+  - the lowest layer;
+  - sections through the storm to 4 and to 16 km, the 16-km set with the 10
+    and 100 ppbv NOx contours;
+  - domain-mean profiles;
+  - the mean below 1 km against time.
+
+  The colour levels are symmetric logarithmic: three bands per decade, white
+  more than three decades below the largest difference.
+- `check_pbl_lnox_mixing.py` gives the differences in percent of the off run.
+- `run_supercell_kzh_restart.sh` restarts a run for 30 s to write YSU's `kzh`,
+  which the output stream does not carry.
+
+Both runs finished cleanly. θ is bitwise identical between them, and the total
+nitrogen agrees to 8e-13.
+
+70–86% of the summed |ΔNOx| lies at 8–12 km, in the lightning plume; under
+0.5% lies below 1 km. Above the PBL top, YSU's scalar coefficient is its
+free-atmosphere heat diffusivity (`xkzq = xkzh`, `bl_ysu.F90:1126`). That is a
+local Richardson-number closure driven by shear, with a moist correction in
+cloud (`bl_ysu.F90:989–1030`). Heat, moisture and condensate are mixed with it
+in both runs; transport extends it to the gases. In a deep-convection case,
+"PBL transport" is therefore mostly turbulent mixing in the free troposphere
+of the storm.
+
+The sections show dipoles inside the plume. The NOx maximum near 10 km is
+lowered and its flanks gain NOx. O3 mirrors NOx: mixing partly fills the
+titration minimum, and the redistributed NO titrates O3 elsewhere.
+
+On − off, in percent of the off run:
+
+| | 30 min | 60 min | 90 min | 120 min |
+| --- | --- | --- | --- | --- |
+| NOx moved to another cell | 0.89 | 0.20 | 0.13 | 0.13 |
+| Plume NOx (≥ 10 ppbv): median / p99 / max | 1.3 / 21 / 136 | 0.25 / 5.0 / 52 | 0.16 / 3.7 / 22 | 0.15 / 3.4 / 23 |
+| Plume O3: median / p99 / max | 0.28 / 2.2 / 3.4 | 0.05 / 0.94 / 1.9 | 0.03 / 0.66 / 1.9 | 0.03 / 0.56 / 2.0 |
+| PBL NOx (≥ 0.1 ppbv): median / p99 / max | no cells | 1.1 / 13 / 18 | 0.59 / 4.7 / 7.8 | 0.89 / 5.7 / 14 |
+| PBL O3: max | < 1e-5 | 0.19 | 0.04 | 0.07 |
+| Largest \|ΔNOx\| / \|ΔO3\| (ppbv) | 17.6 / 1.66 | 9.2 / 0.88 | 8.2 / 0.52 | 7.1 / 0.76 |
+
+The PBL percentages are of small amounts. The mean below 1 km differs by at
+most 6e-4 ppbv of NOx, against about 0.2 ppbv. The lowest-layer differences are
+1e-3 to 1e-2 ppbv. O3 changes less than NOx in percent because it stays near
+37–50 ppbv in the plume, while NOx rises from 0 to about 300 ppbv within a few
+kilometres.
+
+The sizes match YSU's own coefficients. The 30-s restart from the off run's
+2-h state continues that run: the θ correlation is 0.999998, and the scripted
+restart is bitwise identical to one made by hand. In the plume:
+
+- the median `kzh` is YSU's background, 0.01 m²/s;
+- 1.4% of the faces have `kzh` large enough to mix adjacent layers within 2 h
+  (p99 112, max 372 m²/s, under the 1000 m²/s cap).
+
+Diffusing the off run's NOx offline with this `kzh` for 10 min moves 0.039% of
+the NOx, with a plume p99 of 2.9%. The accumulated difference at 120 min is
+0.13% and 3.4%, about three intervals of mixing. That is expected while
+advection carries air through the few turbulent layers and lightning adds
+unmixed NOx.
+
+This is consistency with the scheme's coefficients, not a physical validation
+of YSU. The decline from 30 to 120 min fits a young storm with stronger
+turbulent layers, but `kzh` was written only at 120 min. The plots are in the
+shared plot folder under `supercell-lnox/2026-11-08-pbl-ysu/`. The runs are
+under `~/Data/CheMPAS-A/p4-dev/`: `lnox-ysu-off`, `lnox-ysu-on` and
+`lnox-ysu-off-kzh`.
+
 ### Deferred
 
 - The MMM-physics export upstream, in a versioned release, to replace the
